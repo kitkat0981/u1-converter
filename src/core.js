@@ -308,8 +308,31 @@
     const tgt = this.pickTarget(srcRes, [j.name || '', ...chain], nozzle);
     if (tgt.fellBack) warnings.push(`No U1 equivalent for material type "${first(srcRes.filament_type)}" — based on Generic PLA. Pick a better base below.`);
     const srcName = j.name || first(j.filament_settings_id) || 'Unnamed filament';
-    return { srcName, src: j, srcRes, parentRes, parent, chain, nozzle, base: tgt.base, warnings,
+    const plan = { srcName, src: j, srcRes, parentRes, parent, chain, nozzle, base: tgt.base, warnings,
       outName: stripAt(srcName) + ' @U1' + (nozzle !== '0.4' ? ` ${nozzle}` : '') };
+
+    // A parent that is a Bambu *product* preset (Bambu PETG HF, Bambu PLA Basic…) has its own temperatures,
+    // fans and speed on top of the generic material. Compare against the Bambu generic of the same family
+    // instead, so those product traits carry over together with the user's own tweaks.
+    const isGenericChain = chain.some(n => /^Generic /.test(n)) || !chain.length;
+    if (parent.name && !isGenericChain) {
+      this.library();
+      const product = stripAt(chain[chain.length - 1] || parent.name);
+      for (const fam of familyCandidates(first(srcRes.filament_type), product + ' ' + stripAt(parent.name))) {
+        const g = this._bblIdx['Generic ' + fam];
+        const bn = g && (g[nozzle] || g['0.4']);
+        if (!bn) continue;
+        plan.userKeys = new Set(Object.keys(j).filter(k => !META.has(k) && JSON.stringify(arr(j[k])) !== JSON.stringify(arr(parentRes[k]))));
+        plan.productParentRes = parentRes;
+        plan.parentRes = resolve(this.bbl, bn);
+        plan.src = {};
+        for (const [k, v] of Object.entries(srcRes)) if (!META.has(k)) plan.src[k] = v;
+        plan.parent = Object.assign({}, parent, { generic: bn });
+        plan.scaleVolumetric = true;
+        break;
+      }
+    }
+    return plan;
   };
 
   function resolveMixed(conv, userLib, name) {
@@ -340,7 +363,7 @@
     const myIdx = opts.hotend === HF ? hfIdx : stdIdx;
     const tv = arr(tgtRes.filament_flow_support) || [STD];
 
-    const changeWhy = plan.library ? 'product' : 'your change';
+    const changeWhyOf = sk => plan.library ? 'product' : (plan.userKeys ? (plan.userKeys.has(sk) ? 'your change' : 'product') : 'your change');
     const changes = {};   // key -> new value (full array)
     const rows = [];      // report rows
     const dropped = [];
@@ -352,12 +375,14 @@
       const k = RENAME[sk] || sk;
       const userTouched = Object.prototype.hasOwnProperty.call(src, sk);
       const changedFromParent = userTouched && (!parentKnown || JSON.stringify(arr(src[sk])) !== JSON.stringify(arr(parentRes[sk])));
+      const changeWhy = changeWhyOf(sk);
+      const report = !plan.userKeys || plan.userKeys.has(sk); // product-parent presets: list only the user's own dropped keys
       if (EXCLUDE[k]) {
-        if (changedFromParent && !/Printer link|Process link|structure/.test(EXCLUDE[k])) dropped.push({ key: sk, reason: EXCLUDE[k], value: src[sk] });
+        if (changedFromParent && report && !/Printer link|Process link|structure/.test(EXCLUDE[k])) dropped.push({ key: sk, reason: EXCLUDE[k], value: src[sk] });
         continue;
       }
       if (!this.smKeys.has(k)) {
-        if (changedFromParent) dropped.push({ key: sk, reason: 'Bambu-only setting (Snapmaker Orca has no equivalent)', value: src[sk] });
+        if (changedFromParent && report) dropped.push({ key: sk, reason: 'Bambu-only setting (Snapmaker Orca has no equivalent)', value: src[sk] });
         continue;
       }
       const isMaterial = MATERIAL_KEYS.includes(k);
@@ -380,7 +405,11 @@
         let take;
         if (isMaterial) take = s !== undefined && s !== 'nil';
         else if (opts.mode === 'all') { take = s !== undefined && s !== 'nil'; if (!(userTouched && s !== p)) why = 'copied'; }
-        else take = s !== undefined && (!parentKnown ? userTouched : (userTouched && JSON.stringify(s) !== JSON.stringify(p)));
+        else {
+          take = s !== undefined && (!parentKnown ? userTouched : (userTouched && JSON.stringify(s) !== JSON.stringify(p)));
+          // a value the user set themselves (differs from their own parent) always carries, even if it equals the generic
+          if (!take && plan.userKeys && plan.userKeys.has(sk) && s !== undefined && JSON.stringify(s) !== JSON.stringify(at(arr(plan.productParentRes[sk]), sidx))) { take = true; why = 'your change'; }
+        }
         if (take && s !== out[i]) { out[i] = s; any = true; }
       }
       if (any) {
@@ -391,7 +420,7 @@
 
     // Library filaments: scale max volumetric speed by how much faster/slower the product is than its generic,
     // instead of copying a number tuned for a different hotend.
-    if (plan.library) {
+    if (plan.library || plan.scaleVolumetric) {
       const k = 'filament_max_volumetric_speed';
       const tval = arr(tgtRes[k]);
       if (tval) {
@@ -401,14 +430,16 @@
           const sidx = tval.length === 1 ? myIdx : (tv[i] === HF ? hfIdx : stdIdx);
           const sv = parseFloat(at(arr(srcRes[k]), sidx)), pv = parseFloat(at(arr(parentRes[k]), sidx)), uv = parseFloat(tval[i]);
           if (!(sv > 0 && pv > 0 && uv > 0) || Math.abs(sv - pv) < 1e-9) continue;
+          if (plan.userKeys && plan.userKeys.has(k)) continue; // a value the user typed in stays as typed
           out[i] = String(Math.round(uv * sv / pv * 10) / 10); any = true;
         }
         const row = rows.find(r => r.key === k);
         if (any) {
+          for (let i = 0; i < out.length; i++) if (plan.userKeys && plan.userKeys.has(k) && changes[k]) out[i] = changes[k][i];
           changes[k] = out;
-          if (row) { row.result = out; row.why = 'scaled'; }
+          if (row) { row.result = out; row.why = plan.userKeys && plan.userKeys.has(k) ? 'your change' : 'scaled'; }
           else rows.push({ key: k, from: k, u1: tgtRes[k], bambu: srcRes[k], result: out, why: 'scaled' });
-        } else if (row) { delete changes[k]; rows.splice(rows.indexOf(row), 1); }
+        } else if (row && !(plan.userKeys && plan.userKeys.has(k))) { delete changes[k]; rows.splice(rows.indexOf(row), 1); }
       }
     }
 
@@ -449,7 +480,7 @@
     };
     const note = plan.library
       ? `Converted from the ${plan.library.sourceLabel} profile "${plan.library.preset}" (compared with "${plan.parent.baseline}") onto "${t.name}".`
-      : `Converted from Bambu Studio preset "${plan.srcName}"${plan.parent.name ? ` (parent: ${plan.parent.name})` : ''} onto "${t.name}".`;
+      : `Converted from Bambu Studio preset "${plan.srcName}"${plan.parent.name ? ` (parent: ${plan.parent.name}${plan.parent.generic ? `, compared with ${plan.parent.generic}` : ''})` : ''} onto "${t.name}".`;
     const oldNotes = String(first(srcRes.filament_notes) || '').trim();
     if (!ov.filament_notes) changes.filament_notes = [oldNotes ? `${oldNotes}\n${note}` : note];
     if (opts.standalone) {

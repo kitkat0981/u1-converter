@@ -88,9 +88,36 @@
   select:hover,input[type=text]:hover{border-color:var(--line-strong)}
   .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;display:block;margin-bottom:3px}
   .chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+  .cmpck{display:inline-flex;gap:5px;align-items:center;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+  .cmpbox{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:12px 0}
+  .cmpbox[hidden]{display:none}
+  .cmpctl{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:0 0 10px;font-size:13.5px}
+  .cmpctl label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+  .cmpctl input[type=search]{font:inherit;font-size:13.5px;padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);width:200px}
+  .cmpwrap{overflow:auto;max-height:70vh;border:1px solid var(--line);border-radius:8px}
+  table.cmp{border-collapse:separate;border-spacing:0;font-size:12.5px;min-width:100%}
+  table.cmp th,table.cmp td{padding:5px 9px;border-bottom:1px solid var(--line);vertical-align:top;background:var(--panel)}
+  table.cmp thead th{position:sticky;top:0;z-index:2;text-transform:none;letter-spacing:0;font-size:12.5px;color:var(--ink);background:var(--raised)}
+  table.cmp thead th small{display:block;font-weight:400;color:var(--muted)}
+  table.cmp th.src{border-top:3px solid var(--bambu)}
+  table.cmp th.dst{border-top:3px solid var(--u1)}
+  table.cmp td.k{position:sticky;left:0;z-index:1;font-family:var(--mono);font-size:12px;white-space:nowrap}
+  table.cmp td.v{font-family:var(--mono);white-space:nowrap}
+  table.cmp td.v.d{background:var(--warn-soft);color:var(--warn)}
+  table.cmp tr.grp td{background:var(--raised);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
   .chip{font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--bambu-soft);color:var(--bambu-text);white-space:nowrap}
   .chip.w{background:var(--warn-soft);color:var(--warn)}
   .chip.d{background:var(--drop-soft);color:var(--drop)}
+  button.chip{border:none;font-family:inherit;cursor:pointer;line-height:1.5}
+  button.chip:hover{filter:brightness(1.15)}
+  .pop .clist{margin:0;padding:0;list-style:none;max-height:320px;overflow:auto;font-size:13px}
+  .pop .clist li{padding:5px 0;border-bottom:1px solid var(--line)}
+  .pop .clist li:last-child{border-bottom:none}
+  .pop .clist code{font-family:var(--mono);font-size:12px;color:var(--ink)}
+  .pop .clist .vv{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .pop .clist .vv b{color:var(--u1-text);font-weight:600}
+  .pop .clist .why{font-size:11.5px;color:var(--muted)}
+  .pop{width:400px}
   .det{border-top:1px solid var(--line);padding:12px 14px 14px 52px;display:none;background:var(--surface)}
   @media (max-width:860px){.det{padding-left:14px}}
   .card.open .det{display:block}
@@ -257,6 +284,7 @@
   <div class="bar" id="bar" hidden>
     <h2 id="count"></h2>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button id="cmpbtn" disabled title="Tick Compare on 1–4 filaments">Compare</button>
       <button id="toggleAll">Expand all</button>
       <button id="clear">Clear</button>
       <button id="savemine" title="Keep these filaments in this browser for 3MF projects and calibration">Save to My U1</button>
@@ -264,6 +292,16 @@
     </div>
   </div>
   <div id="skipped"></div>
+  <div class="cmpbox" id="cmpbox" hidden>
+    <div class="bar" style="margin:0 0 10px"><h2 style="font-size:16px">Compare <button class="hq" data-help="compare" aria-label="Help: compare">?</button></h2><button id="cmpclose">Close</button></div>
+    <div class="cmpctl">
+      <label><input type="checkbox" id="cmporig" checked> Include each Bambu original</label>
+      <label><input type="checkbox" id="cmpdiff" checked> Only settings that differ</label>
+      <label><input type="checkbox" id="cmpall"> Include toolchanger and G-code settings</label>
+      <input type="search" id="cmpq" placeholder="Filter settings…">
+    </div>
+    <div class="cmpwrap" id="cmptable"></div>
+  </div>
   <div id="list"></div>
 
   </div><!-- /tab-filaments -->
@@ -416,10 +454,11 @@ function render(){
         <div><span class="lbl">Nozzle</span><select class="nz">${nz.map(x => `<option value="${x}"${x === plan.nozzle ? ' selected' : ''}>${x} mm</option>`).join('')}</select></div>
         <div><span class="lbl">New name</span><input type="text" class="nm" value="${esc(plan.outName)}"></div>
         <div class="chips">
-          <span class="chip">${r.rows.filter(x => !x.manual || x.auto !== undefined).length} carried</span>
-          ${r.rows.some(x => x.manual) ? `<span class="chip w">${r.rows.filter(x => x.manual).length} edited</span>` : ''}
-          ${r.warnings.length ? `<span class="chip w">${r.warnings.length} note${r.warnings.length > 1 ? 's' : ''}</span>` : ''}
-          ${r.dropped.length ? `<span class="chip d">${r.dropped.length} dropped</span>` : ''}
+          <button class="chip" data-help="car-${i}" title="Show the settings carried over">${r.rows.filter(x => !x.manual || x.auto !== undefined).length} carried</button>
+          ${r.rows.some(x => x.manual) ? `<button class="chip w" data-help="edt-${i}" title="Show your edits">${r.rows.filter(x => x.manual).length} edited</button>` : ''}
+          ${r.warnings.length ? `<button class="chip w" data-help="nts-${i}" title="Show the notes">${r.warnings.length} note${r.warnings.length > 1 ? 's' : ''}</button>` : ''}
+          ${r.dropped.length ? `<button class="chip d" data-help="drp-${i}" title="Show the settings not carried over">${r.dropped.length} dropped</button>` : ''}
+          <label class="cmpck"><input type="checkbox" class="cmp"${plan.cmp ? ' checked' : ''}> Compare</label>
           <button class="more" style="padding:2px 9px;font-size:12px">${plan.open ? 'Hide' : 'Details'}</button>
         </div>
       </div>
@@ -434,12 +473,19 @@ function render(){
     </div>`;
   }).join('') : '';
   window.__res = res;
+  res.forEach(({ plan, r }, i) => registerChipHelp(plan, r, i));
+  updCmpBtn();
+  if (!$('#cmpbox').hidden) renderCompare();
 }
 
 $('#list').addEventListener('change', e => {
   const card = e.target.closest('.card'); if (!card) return;
   const p = plans[+card.dataset.i];
   if (e.target.classList.contains('inc')) p.include = e.target.checked;
+  if (e.target.classList.contains('cmp')) {
+    if (e.target.checked && plans.filter(x => x.cmp).length >= 4) { e.target.checked = false; toast('Compare up to 4 filaments at a time'); return; }
+    p.cmp = e.target.checked; updCmpBtn(); if (!$('#cmpbox').hidden) renderCompare(); return;
+  }
   if (e.target.classList.contains('base')) { p.base = e.target.value; const nz = conv.u1NozzlesFor(p.base); if (!nz.includes(p.nozzle)) p.nozzle = nz.includes('0.4') ? '0.4' : nz[0]; }
   if (e.target.classList.contains('nz')) {
     if (p.library) { const keep = { include: p.include, overrides: p.overrides, open: p.open, base: p.base }; const np = conv.analyseLibrary(p.library.id, e.target.value); Object.assign(np, keep); plans[+card.dataset.i] = np; render(); return; }
@@ -477,7 +523,7 @@ $('#list').addEventListener('click', async e => {
 });
 document.querySelectorAll('.opts input').forEach(el => el.addEventListener('change', render));
 $('#toggleAll').onclick = () => { allOpen = !allOpen; plans.forEach(p => p.open = allOpen); $('#toggleAll').textContent = allOpen ? 'Collapse all' : 'Expand all'; render(); };
-$('#clear').onclick = () => { plans = []; skipped = []; render(); };
+$('#clear').onclick = () => { plans = []; skipped = []; $('#cmpbox').hidden = true; render(); };
 
 const drop = $('#drop'), fi = $('#file');
 drop.onclick = () => fi.click();
@@ -522,6 +568,87 @@ function saveToMine(quiet){
 }
 const presetNozzle = p => ((arr0(p.compatible_printers).map(x => (/\((\d\.\d) nozzle\)/.exec(x) || [])[1]).find(Boolean)) || '0.4');
 const arr0 = v => Array.isArray(v) ? v : (v === undefined ? [] : [v]);
+
+
+
+// ===================== badge pop-ups (carried / edited / notes / dropped) =====================
+const WHY_LABEL = { material: 'material property', 'your change': 'your change', product: 'product setting', copied: 'copied from Bambu', scaled: 'scaled', manual: 'edited by you' };
+function chipRow(x){
+  return `<li><code>${esc(x.key)}</code><div class="vv">${esc(fmt(x.u1))} → <b>${esc(fmt(x.result))}</b></div><div class="why">${esc(x.manual ? 'edited by you' + (x.auto !== undefined ? ' · converter had ' + fmt(x.auto) : '') : (WHY_LABEL[x.why] || x.why))}</div></li>`;
+}
+function registerChipHelp(plan, r, i){
+  const name = r.name;
+  const carried = r.rows.filter(x => !x.manual || x.auto !== undefined);
+  HELP['car-' + i] = { e: name, t: `${carried.length} setting${carried.length === 1 ? '' : 's'} carried over`,
+    b: carried.length ? `<p style="margin:0 0 6px">U1 default → value in the converted preset.</p><ul class="clist">${carried.map(chipRow).join('')}</ul>` : '<p>None: the preset matches its U1 base, with your name and notes.</p>' };
+  const edited = r.rows.filter(x => x.manual);
+  HELP['edt-' + i] = { e: name, t: `${edited.length} edited by you`, b: `<ul class="clist">${edited.map(chipRow).join('')}</ul>` };
+  HELP['nts-' + i] = { e: name, t: 'Notes', b: `<ul class="clist">${r.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` };
+  HELP['drp-' + i] = { e: name, t: `${r.dropped.length} not carried over`,
+    b: `<ul class="clist">${r.dropped.map(d => `<li><code>${esc(d.key)}</code><div class="vv">${esc(fmt(d.value))}</div><div class="why">${esc(d.reason)}</div></li>`).join('')}</ul>` };
+}
+
+// ===================== Compare =====================
+const CMP_GROUPS = [
+  ['Material', /^(filament_vendor|filament_type|filament_density|filament_cost|filament_diameter|filament_shrink|filament_shrinkage_compensation_z|temperature_vitrification|filament_soluble|filament_is_support|required_nozzle_HRC|default_filament_colour|filament_is_high_temperature)$/],
+  ['Temperatures', /temperature|plate_temp|chamber/],
+  ['Flow & speed', /flow_ratio|volumetric|pressure_advance|adaptive_pressure|slow_down_min_speed|filament_flow_support/],
+  ['Cooling', /fan|slow_down|cooling_layer_time|close_fan|dont_slow_down/],
+  ['Retraction & travel', /retract|z_hop|wipe|deretraction/],
+];
+const CMP_NOISE = /gcode|ramming|multitool|loading_speed|unloading_speed|cooling_moves|cooling_initial|cooling_final|toolchange|stamping|minimal_purge|tower|notes|settings_id|compatible|inherits|^filament_id$|^version$|^name$|^from$|^type$|instantiation|is_custom_defined|pellet/;
+function cmpGroup(k){ for (const [g, re] of CMP_GROUPS) if (re.test(k)) return g; return 'Other'; }
+function cmpVal(v){ if (v === undefined) return '—'; const a = (Array.isArray(v) ? v : [v]).map(x => String(x)); return a.every(x => x === a[0]) ? a[0] : a.join(' / '); }
+function updCmpBtn(){ const n = plans.filter(p => p.cmp).length; $('#cmpbtn').disabled = n < 1; $('#cmpbtn').textContent = n ? `Compare (${n})` : 'Compare'; }
+function renderCompare(){
+  const sel = (window.__res || []).filter(x => x.plan.cmp);
+  if (!sel.length) { $('#cmpbox').hidden = true; return; }
+  const withOrig = $('#cmporig').checked, onlyDiff = $('#cmpdiff').checked, all = $('#cmpall').checked, q = $('#cmpq').value.trim().toLowerCase();
+  const cols = [];
+  for (const { plan, r } of sel) {
+    const srcIdx = withOrig ? cols.push({ kind: 'src', title: plan.srcName, sub: plan.library ? plan.library.sourceLabel + ' original' : 'Bambu original', cfg: plan.srcRes }) - 1 : -1;
+    const full = Object.assign({}, r.preset.inherits ? B2U.resolve(conv.sm, r.preset.inherits) : {}, r.preset);
+    cols.push({ kind: 'dst', title: r.name, sub: 'U1 result · on ' + (r.preset.inherits || 'standalone'), cfg: full, srcIdx });
+  }
+  // rows: U1 filament keys (+ the Bambu name for renamed keys)
+  const rename = B2U.RENAME, back = {};
+  for (const [b, u] of Object.entries(rename)) back[u] = b;
+  const keys = new Set();
+  for (const c of cols) for (const k of Object.keys(c.cfg)) { const u = c.kind === 'src' ? (rename[k] || k) : k; if (conv.smKeys.has(u)) keys.add(u); }
+  const valOf = (c, k) => c.kind === 'src' ? (c.cfg[k] !== undefined ? c.cfg[k] : c.cfg[back[k]]) : c.cfg[k];
+  const rows = [];
+  for (const k of keys) {
+    if (!all && CMP_NOISE.test(k)) continue;
+    if (q && !k.toLowerCase().includes(q)) continue;
+    const vals = cols.map(c => cmpVal(valOf(c, k)));
+    const dsts = cols.map((c, i) => i).filter(i => cols[i].kind === 'dst');
+    // highlight a U1 cell when it differs from its own original (or, without originals, from the first U1 column)
+    const hi = cols.map((c, i) => c.kind === 'dst' && (withOrig
+      ? (c.srcIdx >= 0 && vals[c.srcIdx] !== '—' && vals[i] !== vals[c.srcIdx])
+      : (i !== dsts[0] && vals[i] !== vals[dsts[0]])));
+    const dstsDiffer = dsts.some(i => vals[i] !== vals[dsts[0]]);
+    const srcKnown = cols.some(c => c.kind === 'src' && valOf(c, k) !== undefined);
+    if (onlyDiff && !hi.some(Boolean) && !dstsDiffer) continue;
+    if (withOrig && !srcKnown && !dstsDiffer && onlyDiff) continue;
+    rows.push({ k, g: cmpGroup(k), vals, hi });
+  }
+  const order = CMP_GROUPS.map(g => g[0]).concat('Other');
+  rows.sort((a, b) => order.indexOf(a.g) - order.indexOf(b.g) || a.k.localeCompare(b.k));
+  let html = `<table class="cmp"><thead><tr><th style="position:sticky;left:0;z-index:3">Setting</th>${cols.map(c => `<th class="${c.kind}">${esc(c.title)}<small>${esc(c.sub)}</small></th>`).join('')}</tr></thead><tbody>`;
+  let g = null;
+  for (const r of rows) {
+    if (r.g !== g) { g = r.g; html += `<tr class="grp"><td colspan="${cols.length + 1}">${esc(g)}</td></tr>`; }
+    html += `<tr><td class="k">${esc(r.k)}</td>${r.vals.map((v, i) => `<td class="v${r.hi[i] ? ' d' : ''}">${esc(v.length > 60 ? v.slice(0, 60) + '…' : v)}</td>`).join('')}</tr>`;
+  }
+  if (!rows.length) html += `<tr><td colspan="${cols.length + 1}" class="muted">${onlyDiff ? 'No differences in these settings.' : 'Nothing matches the filter.'}</td></tr>`;
+  html += '</tbody></table>';
+  $('#cmptable').innerHTML = html;
+  $('#cmpbox').hidden = false;
+}
+$('#cmpbtn').onclick = () => { renderCompare(); $('#cmpbox').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+$('#cmpclose').onclick = () => { $('#cmpbox').hidden = true; };
+['cmporig', 'cmpdiff', 'cmpall'].forEach(id => $('#' + id).addEventListener('change', renderCompare));
+$('#cmpq').addEventListener('input', renderCompare);
 
 // ===================== Library picker =====================
 function renderLib(){
@@ -1117,6 +1244,7 @@ const HELP = {
   project: { e: '3MF projects', t: 'Converting a project', b: `<p>Drop one or more Bambu Studio or MakerWorld <code>.3mf</code> files. Then choose which of the U1's 4 toolheads each colour uses, pick the nozzle and process, and press <b>Convert &amp; download</b>.</p><p>Open the result in Snapmaker Orca. Convert your filaments in the first tab first if you want them in the slot lists.</p>` },
   slots: { e: '3MF projects', t: 'U1 toolhead slots', b: `<p>The U1 has 4 toolheads, T1 to T4. For each one, set the colour shown in Snapmaker Orca and the filament preset it will print with.</p>` },
   map: { e: '3MF projects', t: 'Bambu filaments → U1 slots', b: `<p>Each colour in the Bambu project is sent to one U1 slot. Painted areas and parts follow it.</p><p>Projects with more than 4 colours are merged into the closest-coloured slot. Change any of them here.</p>` },
+  compare: { e: 'Filament presets', t: 'Compare filaments', b: `<p>Tick <b>Compare</b> on up to 4 filaments, then press <b>Compare</b>. Each one shows as a column with its final U1 values.</p><p>With <b>Include each Bambu original</b> on, each U1 result sits next to its original (green = original, blue = U1) and amber marks what the conversion changed. With it off, amber marks where a filament differs from the first one.</p>` },
   library: { e: 'Filament presets', t: 'Filament libraries', b: `<p>Pick filaments you use but never customised: Bambu's own (PLA Matte, Silk+, PETG HF…) or other brands from the OrcaSlicer library (SUNLU, Polymaker, eSUN…).</p><p>Each keeps what makes it different from a generic filament (temperatures, fans, density, flow) and is built on the U1's matching generic preset. Max volumetric speed is scaled, not copied. Calibrate afterwards in the <b>Calibrate</b> tab.</p>` },
   spools: { e: 'My U1', t: 'Spools loaded in my U1', b: `<p>Tell the converter what is in each toolhead. Every 3MF project is then mapped onto these spools automatically: same material first, then the closest colour.</p><p>You can still change any slot per project.</p>` },
   myfil: { e: 'My U1', t: 'My filaments', b: `<p>Filaments you converted and saved. They're kept in this browser, are offered in the 3MF slot lists, and get your calibration results.</p><p>Use <b>Back up</b> to keep a copy or move them to another computer.</p>` },
