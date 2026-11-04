@@ -142,6 +142,40 @@ async function bambuProject() {
     assert.ok(!('not_a_key' in r.preset));
   });
 
+  console.log('filament libraries');
+  const lib = conv.library();
+  await ok('lists Bambu and OrcaSlicer-library filaments', () => {
+    for (const id of ['bambu|Bambu PLA Matte', 'bambu|Bambu PLA Silk+', 'bambu|Bambu PETG HF', 'orca|SUNLU PETG']) assert.ok(lib.byId[id], id);
+    assert.ok(!lib.list.some(e => e.vendor === 'Generic'));
+  });
+  await ok('library filament = its difference from the generic, on the U1 generic', () => {
+    const r = conv.build(conv.analyseLibrary('orca|SUNLU PETG', '0.4'), {});
+    assert.strictEqual(conv.u1BaseOf[r.target], 'Generic PETG');
+    assert.deepStrictEqual(r.preset.nozzle_temperature, ['245']);
+    assert.deepStrictEqual(r.preset.filament_vendor, ['SUNLU']);
+    const silk = conv.build(conv.analyseLibrary('bambu|Bambu PLA Silk+', '0.4'), {});
+    assert.strictEqual(conv.u1BaseOf[silk.target], 'Generic PLA Silk');
+    assert.ok(sm[silk.preset.inherits]);
+  });
+  await ok('scales max volumetric speed instead of copying it', () => {
+    const r = conv.build(conv.analyseLibrary('bambu|Bambu PLA Basic', '0.4'), {});
+    const row = r.rows.find(x => x.key === 'filament_max_volumetric_speed');
+    assert.strictEqual(row.why, 'scaled');
+  });
+
+  await ok('calibration results go into the right hotend slot', () => {
+    const r = conv.build(conv.analyseLibrary('bambu|Bambu PLA Matte', '0.4'), {});
+    const cur = conv.presetValues(r.preset, 'standard');
+    assert.ok(cur.maxvol && cur.temp);
+    const c = conv.applyCalibration(r.preset, { flow: '0.97', pa: '0.032', maxvol: '18', temp: '', retract: '0.6' }, 'standard', '2026-11-04');
+    const v = conv.presetValues(c, 'standard');
+    assert.strictEqual(v.flow, '0.97'); assert.strictEqual(v.pa, '0.032'); assert.strictEqual(v.maxvol, '18'); assert.strictEqual(v.retract, '0.6');
+    assert.strictEqual(v.temp, cur.temp);
+    const full = Object.assign({}, data.sm[c.inherits], c);
+    if (Array.isArray(c.enable_pressure_advance)) assert.strictEqual(c.enable_pressure_advance[0], '1');
+    assert.match(c.filament_notes[0], /U1 calibration 2026-11-04/);
+  });
+
   console.log('3mf projects');
   const { zip, trees } = await bambuProject();
   await ok('paint encoding round-trips', () => { for (const t of trees) assert.strictEqual(remapPaint(t, x => x), t); });
@@ -174,11 +208,33 @@ async function bambuProject() {
     assert.strictEqual(String(cfg.support_filament), '4');
     assert.ok(report.skipped.some(s => s.key === 'outer_wall_speed'));
   });
-  await ok('re-centres plates and the prime tower', async () => {
-    const m = await out.file('3D/3dmodel.model').async('string');
-    assert.match(m, /transform="1 0 0 0 1 0 0 0 1 135\.5 136 5"/);
-    assert.match(m, /transform="1 0 0 0 1 0 0 0 1 459\.5 136 5"/);
-    assert.deepStrictEqual(cfg.wipe_tower_x, ['172.5', '172.5']);
+  await ok('centres each plate\'s models on the U1 bed by their real size', async () => {
+    const out2 = await JSZip.loadAsync(await out.generateAsync({ type: 'nodebuffer' }));
+    const info2 = await c3.inspect(out2);
+    info2.bed = c3.dstBed(info2);
+    const geo = await c3.geometry(out2, false);
+    const sh = c3.plateShifts(info2, geo);
+    for (const p of sh) { assert.ok(Math.abs(p.dx) < 0.01 && Math.abs(p.dy) < 0.01, 'plate centred: ' + JSON.stringify(p)); }
+    for (let i = 0; i < cfg.wipe_tower_x.length; i++) {
+      const x = +cfg.wipe_tower_x[i], y = +cfg.wipe_tower_y[i];
+      assert.ok(x >= 0.5 && x <= 270.5 - 30 && y >= 1 && y <= 271 - 45, 'tower on bed');
+    }
+  });
+  await ok('maps Bambu colours onto the loaded U1 spools', () => {
+    const spools = [
+      { colour: '#000000', preset: { kind: 'system', name: conv.targetName('Generic PLA', '0.4').name } },
+      { colour: '#FF0000', preset: { kind: 'system', name: conv.targetName('Generic PLA', '0.4').name } },
+      { colour: '#00FF00', preset: { kind: 'system', name: conv.targetName('Generic PLA', '0.4').name } },
+      { colour: '#0000FF', preset: { kind: 'system', name: conv.targetName('Generic PETG HF', '0.4').name } },
+    ];
+    const p = c3.defaultPlan(info, { spools, nozzle: '0.4' });
+    assert.deepStrictEqual(p.map, { 1: 2, 2: 3, 3: 4, 4: 1, 5: 2 });
+  });
+  await ok('3D preview colours triangles by U1 slot', async () => {
+    const pv = await c3.previewMesh(zip, info, plan, 0);
+    assert.ok(pv.triangles > 50 && pv.positions.length === pv.triangles * 9);
+    assert.ok([...pv.slots].every(s => s >= 1 && s <= 4));
+    assert.ok(new Set(pv.slots).size >= 3);
   });
   await ok('remaps parts, ranges, layer changes and paint', async () => {
     const ms = await out.file('Metadata/model_settings.config').async('string');

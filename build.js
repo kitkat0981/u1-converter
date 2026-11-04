@@ -8,8 +8,10 @@ const read = f => fs.readFileSync(path.join(__dirname, f), 'utf8');
 const jszip = fs.readFileSync(require.resolve('jszip/dist/jszip.min.js'), 'utf8');
 const core = read('src/core.js');
 const threemf = read('src/threemf.js');
+const threeDir = path.join(path.dirname(require.resolve('three')), '..');
+const three = fs.readFileSync(path.join(threeDir, 'build/three.min.js'), 'utf8') + '\n' + fs.readFileSync(path.join(threeDir, 'examples/js/controls/OrbitControls.js'), 'utf8');
 const data = fs.readFileSync(path.join(__dirname, 'data/presets.json.gz')).toString('base64');
-for (const [n, s] of [['jszip', jszip], ['core', core], ['threemf', threemf]]) if (/<\/script/i.test(s)) throw new Error(`${n} contains </script>`);
+for (const [n, s] of [['jszip', jszip], ['core', core], ['threemf', threemf], ['three', three]]) if (/<\/script/i.test(s)) throw new Error(`${n} contains </script>`);
 const head = embedded ? '' : '\n<link rel="manifest" href="manifest.webmanifest">\n<link rel="icon" href="icon.svg" type="image/svg+xml">\n<link rel="apple-touch-icon" href="icon-192.png">\n<meta name="theme-color" content="#17181B">';
 const pwa = embedded ? '' : [
   "try { if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js'); } catch {}",
@@ -21,6 +23,7 @@ const html = read('src/page.html')
   .replace('/*JSZIP*/', () => jszip)
   .replace('/*CORE*/', () => core)
   .replace('/*THREEMF*/', () => threemf)
+  .replace('/*THREE*/', () => three)
   .replace('/*DATA*/', () => data)
   .replace('/*PWA*/', () => pwa);
 const out = path.join(__dirname, embedded ? 'dist-embedded' : 'dist');

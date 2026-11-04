@@ -9,6 +9,7 @@
     "test": "node test/run.js"
   },
   "dependencies": {
-    "jszip": "3.10.2"
+    "jszip": "3.10.2",
+    "three": "0.147.0"
   }
 }

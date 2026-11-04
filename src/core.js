@@ -121,7 +121,87 @@
       }
     }
     this.u1Names = Object.keys(this.u1BaseOf).sort();
+    this.orca = makeLib(data.orcaLib || {});
+    this._library = null;
   }
+
+  // ---------- Filament libraries: Bambu Studio's own + the OrcaSlicer filament library (SUNLU, Polymaker…) ----------
+  const LIB_SKIP_VENDORS = new Set(['Generic']);
+  Converter.prototype.library = function () {
+    if (this._library) return this._library;
+    const entries = {}, bblIdx = {};
+    for (const [n, j] of Object.entries(this.bbl.byName)) {
+      if (!j || j.instantiation !== 'true') continue;
+      const r = resolve(this.bbl, n);
+      const nozzles = (arr(r.compatible_printers) || []).map(p => (/^Bambu Lab P1S (\d\.\d) nozzle$/.exec(p) || [])[1]).filter(Boolean);
+      if (!nozzles.length) continue;
+      const product = stripAt(n);
+      for (const nz of nozzles) (bblIdx[product] = bblIdx[product] || {})[nz] = (bblIdx[product] || {})[nz] || n;
+      const vendor = String(first(r.filament_vendor) || '');
+      if (LIB_SKIP_VENDORS.has(vendor)) continue;
+      const id = 'bambu|' + product;
+      const e = entries[id] = entries[id] || { id, source: 'bambu', sourceLabel: 'Bambu Studio', vendor: vendor === 'Bambu Lab' ? 'Bambu Lab' : vendor, product, type: String(first(r.filament_type) || ''), nozzles: {} };
+      for (const nz of nozzles) e.nozzles[nz] = e.nozzles[nz] || n;
+    }
+    for (const [n, j] of Object.entries(this.orca.byName)) {
+      if (!j || j.instantiation !== 'true') continue;
+      const r = resolve(this.orca, n);
+      const vendor = String(first(r.filament_vendor) || '');
+      if (LIB_SKIP_VENDORS.has(vendor) || vendor === 'Bambu Lab') continue;
+      const product = stripAt(n);
+      const id = 'orca|' + product;
+      entries[id] = { id, source: 'orca', sourceLabel: 'OrcaSlicer library', vendor, product, type: String(first(r.filament_type) || ''), name: n };
+    }
+    this._bblIdx = bblIdx;
+    const list = Object.values(entries).sort((a, b) => a.vendor.localeCompare(b.vendor) || a.product.localeCompare(b.product));
+    this._library = { list, byId: entries };
+    return this._library;
+  };
+
+  function familyCandidates(type, product) {
+    const t = String(type || 'PLA').toUpperCase(), p = String(product || '').toLowerCase(), c = [];
+    if (t.startsWith('PLA')) {
+      if (/silk/.test(p)) c.push('PLA Silk');
+      if (/matte/.test(p)) c.push('PLA Matte');
+      if (/high speed|\bhs\b|hyper|rapid/.test(p)) c.push('PLA High Speed');
+      if (/support/.test(p)) c.push('Support For PLA');
+    }
+    if (t === 'PETG' && /\bhf\b|high flow/.test(p)) c.push('PETG HF');
+    if (t.startsWith('TPU') && /\bhf\b/.test(p)) c.push('TPU 95A HF');
+    if (TYPE_MAP[t]) c.push(TYPE_MAP[t]);
+    c.push(t, 'PLA');
+    return [...new Set(c)];
+  }
+
+  /** Plan for converting a library filament: its difference from the source's own generic of the same family,
+   *  applied onto the U1's generic of that family. */
+  Converter.prototype.analyseLibrary = function (id, nozzle) {
+    const L = this.library();
+    const e = L.byId[id];
+    if (!e) throw new Error('Unknown library filament ' + id);
+    const warnings = [];
+    const lib = e.source === 'bambu' ? this.bbl : this.orca;
+    let srcName = e.source === 'bambu' ? (e.nozzles[nozzle] || e.nozzles['0.4'] || Object.values(e.nozzles)[0]) : e.name;
+    if (e.source === 'bambu' && !e.nozzles[nozzle]) warnings.push(`Bambu has no ${nozzle} mm profile for ${e.product}; its ${e.nozzles['0.4'] ? '0.4' : Object.keys(e.nozzles)[0]} mm profile was used.`);
+    const srcRes = resolve(lib, srcName);
+    let base = null, baseName = null;
+    for (const fam of familyCandidates(first(srcRes.filament_type) || e.type, e.product)) {
+      const u1 = 'Generic ' + fam;
+      if (!this.u1Table[u1]) continue;
+      if (e.source === 'bambu') { const g = this._bblIdx['Generic ' + fam]; baseName = g && (g[nozzle] || g['0.4']); }
+      else baseName = findIn(this.orca, `Generic ${fam} @System`);
+      if (baseName) { base = u1; break; }
+    }
+    if (!base) { base = 'Generic PLA'; baseName = e.source === 'bambu' ? (this._bblIdx['Generic PLA'] || {})['0.4'] : findIn(this.orca, 'Generic PLA @System'); warnings.push('No matching generic material — based on Generic PLA. Pick a better base.'); }
+    const parentRes = baseName ? resolve(lib, baseName) : {};
+    const src = {};
+    for (const [k, v] of Object.entries(srcRes)) if (!META.has(k)) src[k] = v;
+    return {
+      srcName: e.product, src, srcRes, parentRes, parent: { name: null, baseline: baseName, how: 'library' }, chain: [srcName],
+      nozzle, base, warnings, outName: e.product + ' @U1' + (nozzle !== '0.4' ? ` ${nozzle}` : ''),
+      library: { id, source: e.source, sourceLabel: e.sourceLabel, vendor: e.vendor, product: e.product, preset: srcName },
+    };
+  };
 
   Converter.prototype.u1Bases = function (nozzle) {
     return Object.keys(this.u1Table).filter(b => !nozzle || this.u1Table[b][nozzle]).sort();
@@ -260,6 +340,7 @@
     const myIdx = opts.hotend === HF ? hfIdx : stdIdx;
     const tv = arr(tgtRes.filament_flow_support) || [STD];
 
+    const changeWhy = plan.library ? 'product' : 'your change';
     const changes = {};   // key -> new value (full array)
     const rows = [];      // report rows
     const dropped = [];
@@ -286,13 +367,13 @@
         // scalar
         const want = isMaterial || opts.mode === 'all' || changedFromParent;
         if (want && sv !== undefined && JSON.stringify(sv) !== JSON.stringify(tvVal)) {
-          changes[k] = sv; rows.push({ key: k, from: sk, u1: tvVal, bambu: sv, result: sv, why: isMaterial ? 'material' : (changedFromParent ? 'your change' : 'copied') });
+          changes[k] = sv; rows.push({ key: k, from: sk, u1: tvVal, bambu: sv, result: sv, why: isMaterial ? 'material' : (changedFromParent ? changeWhy : 'copied') });
         }
         continue;
       }
       const base = (arr(tvVal) || [at(sv, 0)]).slice();
       const out = base.slice();
-      let any = false, why = isMaterial ? 'material' : 'your change';
+      let any = false, why = isMaterial ? 'material' : changeWhy;
       for (let i = 0; i < out.length; i++) {
         const sidx = base.length === 1 ? myIdx : (tv[i] === HF ? hfIdx : stdIdx);
         const s = at(sv, sidx), p = at(arr(pv), sidx);
@@ -305,6 +386,29 @@
       if (any) {
         changes[k] = out;
         rows.push({ key: k, from: sk, u1: tvVal, bambu: sv, result: out, why });
+      }
+    }
+
+    // Library filaments: scale max volumetric speed by how much faster/slower the product is than its generic,
+    // instead of copying a number tuned for a different hotend.
+    if (plan.library) {
+      const k = 'filament_max_volumetric_speed';
+      const tval = arr(tgtRes[k]);
+      if (tval) {
+        const out = tval.slice();
+        let any = false;
+        for (let i = 0; i < out.length; i++) {
+          const sidx = tval.length === 1 ? myIdx : (tv[i] === HF ? hfIdx : stdIdx);
+          const sv = parseFloat(at(arr(srcRes[k]), sidx)), pv = parseFloat(at(arr(parentRes[k]), sidx)), uv = parseFloat(tval[i]);
+          if (!(sv > 0 && pv > 0 && uv > 0) || Math.abs(sv - pv) < 1e-9) continue;
+          out[i] = String(Math.round(uv * sv / pv * 10) / 10); any = true;
+        }
+        const row = rows.find(r => r.key === k);
+        if (any) {
+          changes[k] = out;
+          if (row) { row.result = out; row.why = 'scaled'; }
+          else rows.push({ key: k, from: k, u1: tgtRes[k], bambu: srcRes[k], result: out, why: 'scaled' });
+        } else if (row) { delete changes[k]; rows.splice(rows.indexOf(row), 1); }
       }
     }
 
@@ -329,11 +433,11 @@
       const lim = arr(tgtRes.filament_max_volumetric_speed);
       mvs.forEach((v, i) => {
         const l = parseFloat(at(lim, i));
-        if (parseFloat(v) > l * 1.15) warnings.push(`Max volumetric speed ${v} mm³/s is above the U1 default of ${l} for this material${tv.length > 1 ? ` (${tv[i] === HF ? 'high-flow' : 'standard'} hotend)` : ''}. The U1 hotend may not keep up — run the volumetric speed test.`);
+        if (parseFloat(v) > l * 1.15) warnings.push(`Max volumetric speed ${v} mm³/s${plan.library ? ' (scaled from the source profile)' : ''} is above the U1 default of ${l} for this material${tv.length > 1 ? ` (${tv[i] === HF ? 'high-flow' : 'standard'} hotend)` : ''}. The U1 hotend may not keep up — run the volumetric speed test.`);
       });
     }
-    if (changes.filament_flow_ratio) warnings.push('Flow ratio came from the P1S. Re-run the flow-rate calibration on the U1 before trusting it.');
-    if (dropped.some(d => /G-code/.test(d.reason))) warnings.push('Your custom filament start/end G-code was not copied (Bambu-specific). Re-add anything you need using Klipper commands.');
+    if (changes.filament_flow_ratio) warnings.push(plan.library ? 'Flow ratio differs from the generic profile. Run the flow-rate calibration on the U1 to confirm it.' : 'Flow ratio came from the P1S. Re-run the flow-rate calibration on the U1 before trusting it.');
+    if (!plan.library && dropped.some(d => /G-code/.test(d.reason))) warnings.push('Your custom filament start/end G-code was not copied (Bambu-specific). Re-add anything you need using Klipper commands.');
 
     const name = plan.outName;
     let preset;
@@ -343,7 +447,9 @@
       version: opts.version, filament_settings_id: [name], filament_id: 'P' + hash7(name),
       compatible_printers: [`Snapmaker U1 (${t.nozzle} nozzle)`],
     };
-    const note = `Converted from Bambu Studio preset "${plan.srcName}"${plan.parent.name ? ` (parent: ${plan.parent.name})` : ''} onto "${t.name}".`;
+    const note = plan.library
+      ? `Converted from the ${plan.library.sourceLabel} profile "${plan.library.preset}" (compared with "${plan.parent.baseline}") onto "${t.name}".`
+      : `Converted from Bambu Studio preset "${plan.srcName}"${plan.parent.name ? ` (parent: ${plan.parent.name})` : ''} onto "${t.name}".`;
     const oldNotes = String(first(srcRes.filament_notes) || '').trim();
     if (!ov.filament_notes) changes.filament_notes = [oldNotes ? `${oldNotes}\n${note}` : note];
     if (opts.standalone) {
@@ -356,6 +462,57 @@
     rows.sort((a, b) => a.key.localeCompare(b.key));
     return { name, target: t.name, nozzle: t.nozzle, preset, rows, dropped, warnings, variants: tv, tgtRes, filamentKeys };
   };
+
+  // ---------- Calibration results (measured on the U1) -> preset values ----------
+  const CALIB_FIELDS = [
+    { id: 'flow', key: 'filament_flow_ratio', label: 'Flow ratio', test: 'Flow rate' },
+    { id: 'pa', key: 'pressure_advance', label: 'Pressure advance', test: 'Pressure advance' },
+    { id: 'maxvol', key: 'filament_max_volumetric_speed', label: 'Max volumetric speed (mm³/s)', test: 'Max flowrate' },
+    { id: 'temp', key: 'nozzle_temperature', label: 'Nozzle temperature (°C)', test: 'Temperature' },
+    { id: 'temp1', key: 'nozzle_temperature_initial_layer', label: 'First-layer temperature (°C)', test: 'Temperature' },
+    { id: 'retract', key: 'filament_retraction_length', label: 'Retraction length (mm)', test: 'Retraction test' },
+  ];
+  /** Current effective values of a U1 preset (user preset JSON) for the calibration fields. */
+  Converter.prototype.presetValues = function (preset, hotend) {
+    const full = Object.assign({}, preset.inherits ? resolve(this.sm, findIn(this.sm, preset.inherits) || preset.inherits) : {}, preset);
+    const fs = arr(full.filament_flow_support) || [STD];
+    const out = {};
+    for (const f of CALIB_FIELDS) {
+      const v = arr(full[f.key]);
+      if (!v) continue;
+      const i = v.length === 1 ? 0 : Math.max(0, fs.indexOf(hotend === HF ? HF : STD));
+      out[f.id] = v[i];
+    }
+    if (out.retract === 'nil') out.retract = '';
+    return out;
+  };
+  /** Write calibration results into a U1 preset for one hotend type. Returns a new preset object. */
+  Converter.prototype.applyCalibration = function (preset, cal, hotend, date) {
+    const p = JSON.parse(JSON.stringify(preset));
+    const full = Object.assign({}, preset.inherits ? resolve(this.sm, findIn(this.sm, preset.inherits) || preset.inherits) : {}, preset);
+    const fs = arr(full.filament_flow_support) || [STD];
+    const set = (key, val) => {
+      const cur = (arr(full[key]) || [String(val)]).slice();
+      const i = cur.length === 1 ? 0 : Math.max(0, fs.indexOf(hotend === HF ? HF : STD));
+      cur[i] = String(val);
+      p[key] = cur;
+    };
+    const done = [];
+    for (const f of CALIB_FIELDS) {
+      const v = cal && cal[f.id];
+      if (v === undefined || v === null || String(v).trim() === '' || isNaN(parseFloat(v))) continue;
+      set(f.key, parseFloat(v));
+      done.push(`${f.label} ${parseFloat(v)}`);
+    }
+    if (cal && cal.pa !== undefined && String(cal.pa).trim() !== '' && !isNaN(parseFloat(cal.pa))) set('enable_pressure_advance', 1);
+    if (done.length) {
+      const old = String(first(p.filament_notes) || first(full.filament_notes) || '').split('\n').filter(l => !/^U1 calibration/.test(l));
+      old.push(`U1 calibration ${date || ''} (${hotend === HF ? 'high-flow' : 'standard'} hotend): ${done.join(', ')}`.replace('  ', ' '));
+      p.filament_notes = [old.join('\n').trim()];
+    }
+    return p;
+  };
+  Converter.CALIB_FIELDS = CALIB_FIELDS;
 
   // Parse a list of {name, text} JSON entries; returns {presets, skipped}
   Converter.prototype.collect = function (entries) {
@@ -383,7 +540,7 @@
     return results;
   };
 
-  const api = { Converter, makeLib, resolve, isFilamentPreset, hash7, EXCLUDE, MATERIAL_KEYS, RENAME, TYPE_MAP };
+  const api = { Converter, makeLib, resolve, familyCandidates, CALIB_FIELDS, isFilamentPreset, hash7, EXCLUDE, MATERIAL_KEYS, RENAME, TYPE_MAP };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.B2U = api;
 })(typeof window !== 'undefined' ? window : globalThis);

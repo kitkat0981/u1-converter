@@ -4,7 +4,7 @@
     python3 tools/update-presets.py
 
 Downloads (sparse, shallow) into tools/upstream/:
-  - bambulab/BambuStudio          resources/profiles/BBL/filament
+  - bambulab/BambuStudio          latest release tag: resources/profiles/BBL/filament
   - Snapmaker/OrcaSlicer          latest release tag (vX.Y.Z): resources/profiles/Snapmaker
                                   (U1 filament/process/printer presets as shipped) and src/libslic3r
                                   (option lists, ranges and enums). Using the release rather than the
@@ -13,13 +13,13 @@ Downloads (sparse, shallow) into tools/upstream/:
   - josuanbn/bl2u1                u1_template.3mf (base project settings, GPL-3.0)
 Then run `npm test` and commit data/presets.json.gz.
 """
-import glob, gzip, json, os, re, subprocess, sys, zipfile, datetime
+import glob, gzip, json, os, re, subprocess, sys, zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UP = os.path.join(ROOT, 'tools', 'upstream')
 REPOS = {
     'bambu': ('https://github.com/bambulab/BambuStudio.git', ['resources/profiles/BBL/filament']),
-    'orca': ('https://github.com/Snapmaker/OrcaSlicer.git', ['resources/profiles/Snapmaker', 'src/libslic3r']),
+    'orca': ('https://github.com/Snapmaker/OrcaSlicer.git', ['resources/profiles/Snapmaker', 'resources/profiles/OrcaFilamentLibrary', 'src/libslic3r']),
     'bl2u1': ('https://github.com/josuanbn/bl2u1.git', None),
 }
 
@@ -30,7 +30,7 @@ def git(*a, cwd=None):
 
 def latest_release(url):
     tags = subprocess.run(['git', 'ls-remote', '--tags', url], check=True, capture_output=True, text=True).stdout
-    vs = sorted({m.group(1) for m in re.finditer(r'refs/tags/(v\d+\.\d+\.\d+)$', tags, re.M)},
+    vs = sorted({m.group(1) for m in re.finditer(r'refs/tags/(v\d+(?:\.\d+){2,3})$', tags, re.M)},
                 key=lambda v: tuple(int(x) for x in v[1:].split('.')))
     return vs[-1]
 
@@ -52,9 +52,9 @@ def fetch(name, tag=None):
     return d, git('log', '-1', '--format=%h %cs', cwd=d)
 
 
-def load_lib(d):
+def load_lib(d, recursive=False):
     lib = {}
-    for f in glob.glob(os.path.join(d, '*.json')):
+    for f in sorted(glob.glob(os.path.join(d, '**', '*.json') if recursive else os.path.join(d, '*.json'), recursive=recursive)):
         try:
             j = json.load(open(f, encoding='utf-8-sig'))
         except Exception as e:
@@ -149,7 +149,9 @@ def option_defs(orca):
 
 def main():
     os.makedirs(UP, exist_ok=True)
-    bambu, bv = fetch('bambu')
+    btag = latest_release(REPOS['bambu'][0])
+    print('Bambu Studio release', btag)
+    bambu, bv = fetch('bambu', btag)
     tag = latest_release(REPOS['orca'][0])
     print('Snapmaker Orca release', tag)
     orca, ov = fetch('orca', tag)
@@ -164,26 +166,27 @@ def main():
     sm = chain(fl, lambda n: is_u1(fl, n))
     proc = chain(pl, lambda n: is_u1(pl, n))
     mach = chain(ml, lambda n: U1_PRINTER.search(n) is not None)
+    orca_lib = load_lib(os.path.join(orca, 'resources/profiles/OrcaFilamentLibrary/filament'), recursive=True)
     keys = option_lists(orca)
     allk = set(keys['filament']) | set(keys['print']) | set(keys['printer'])
     defs = {k: v for k, v in option_defs(orca).items() if k in allk and ('min' in v or 'max' in v or 'enum' in v)}
     with zipfile.ZipFile(os.path.join(bl, 'u1_template.3mf')) as z:
         tpl = json.loads(z.read('Metadata/project_settings.config').decode('utf-8-sig'))
 
-    if len(bbl) < 1000 or len(sm) < 50 or len(proc) < 10 or not mach:
-        sys.exit(f'Unexpected upstream layout (bambu {len(bbl)}, U1 filaments {len(sm)}, processes {len(proc)}, machines {len(mach)})')
+    if len(bbl) < 1000 or len(sm) < 50 or len(proc) < 10 or not mach or len(orca_lib) < 50:
+        sys.exit(f'Unexpected upstream layout (bambu {len(bbl)}, U1 filaments {len(sm)}, processes {len(proc)}, machines {len(mach)}, library {len(orca_lib)})')
     data = {
-        'bbl': bbl, 'sm': sm, 'smProc': proc, 'smMach': mach,
+        'bbl': bbl, 'sm': sm, 'smProc': proc, 'smMach': mach, 'orcaLib': orca_lib,
         'smKeys': keys['filament'], 'printKeys': keys['print'], 'printerKeys': keys['printer'], 'defs': defs, 'tpl': tpl,
-        'meta': {'bambu': f'bambulab/BambuStudio {bv}', 'snapmaker': f'Snapmaker Orca {tag} (profiles {pver})',
-                 'orca': f'Snapmaker/OrcaSlicer {tag} {ov}', 'template': f'josuanbn/bl2u1 {blv}', 'built': datetime.date.today().isoformat()},
+        'meta': {'bambu': f'Bambu Studio {btag}', 'snapmaker': f'Snapmaker Orca {tag} (profiles {pver})',
+                 'template': f'josuanbn/bl2u1 {blv.split()[0]}'},
     }
-    raw = json.dumps(data, separators=(',', ':')).encode()
+    raw = json.dumps(data, separators=(',', ':'), sort_keys=True).encode()
     out = os.path.join(ROOT, 'data', 'presets.json.gz')
     with open(out, 'wb') as f:
         f.write(gzip.compress(raw, 9, mtime=0))
     print(f'wrote {out}: {len(bbl)} Bambu filaments, {len(sm)} U1 filaments, {len(proc)} U1 processes, '
-          f'{len(mach)} U1 printers, {len(defs)} option rules ({len(raw) // 1024} KB raw)')
+          f'{len(mach)} U1 printers, {len(orca_lib)} library filaments, {len(defs)} option rules ({len(raw) // 1024} KB raw)')
 
 
 if __name__ == '__main__':

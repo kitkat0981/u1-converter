@@ -62,6 +62,66 @@
   function paintStates(s, set) {
     remapPaint(s, st => { if (st) set.add(st); return st; });
   }
+  // Dominant filament state of a painted triangle (leaves weighted by their share of the triangle).
+  function paintDominant(s) {
+    let pos = s.length - 1;
+    const w = {};
+    const nib = () => { const c = s.charCodeAt(pos--); return c <= 57 ? c - 48 : (c <= 70 ? c - 55 : c - 87); };
+    const node = weight => {
+      const code = nib(), split = code & 3;
+      if (split) { for (let i = 0; i <= split; i++) node(weight / (split + 1)); return; }
+      let st;
+      if ((code & 12) === 12) { let nx = nib(), num = 0; while (nx === 15) { num++; nx = nib(); } st = nx + 15 * num + 3; } else st = code >> 2;
+      w[st] = (w[st] || 0) + weight;
+    };
+    try { node(1); } catch (e) { return 0; }
+    let best = 0, bw = -1;
+    for (const k in w) if (w[k] > bw) { bw = w[k]; best = +k; }
+    return best;
+  }
+
+  // 3MF uses row vectors: p' = p · M, transform="m00 m01 m02 m10 m11 m12 m20 m21 m22 m30 m31 m32"
+  const IDENT = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
+  const parseT = t => { const a = String(t || '').trim().split(/\s+/).map(Number); return a.length === 12 && !a.some(isNaN) ? a : IDENT.slice(); };
+  function mul(a, b) { // apply a then b
+    const r = new Array(12);
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) {
+      const ai = i * 3;
+      r[ai + j] = (i < 3 ? 0 : b[9 + j]) + a[ai] * b[j] + a[ai + 1] * b[3 + j] + a[ai + 2] * b[6 + j];
+    }
+    return r;
+  }
+  function parseMeshes(text, withTris) {
+    const out = {};
+    for (const m of text.matchAll(/<object\b([^>]*)>([\s\S]*?)<\/object>/g)) {
+      const id = (/\bid="(\d+)"/.exec(m[1]) || [])[1];
+      const body = m[2];
+      const comps = [...body.matchAll(/<component\b([^>]*)\/?>/g)].map(c => ({
+        path: ((/(?:p:)?path="([^"]*)"/.exec(c[1]) || [])[1] || '').replace(/^\//, ''),
+        objectid: (/objectid="(\d+)"/.exec(c[1]) || [])[1], transform: parseT((/transform="([^"]*)"/.exec(c[1]) || [])[1]),
+      }));
+      let mesh = null;
+      const vi = body.indexOf('<vertices');
+      if (vi >= 0) {
+        const vs = [];
+        for (const v of body.matchAll(/<vertex\s+x="([^"]+)"\s+y="([^"]+)"\s+z="([^"]+)"/g)) vs.push(+v[1], +v[2], +v[3]);
+        mesh = { verts: Float32Array.from(vs) };
+        if (withTris) {
+          const ts = [], paint = [];
+          let anyPaint = false;
+          for (const t of body.matchAll(/<triangle\s+v1="(\d+)"\s+v2="(\d+)"\s+v3="(\d+)"([^>]*)>/g)) {
+            ts.push(+t[1], +t[2], +t[3]);
+            const pc = (/paint_color="([0-9A-Fa-f]+)"/.exec(t[4]) || [])[1];
+            paint.push(pc || null); if (pc) anyPaint = true;
+          }
+          mesh.tris = Uint32Array.from(ts);
+          mesh.paint = anyPaint ? paint : null;
+        }
+      }
+      out[id] = { comps, mesh };
+    }
+    return out;
+  }
 
   // ---------- plates ----------
   function colCount(n) { const v = Math.sqrt(n), r = Math.round(v); return v > r ? r + 1 : r; }
@@ -131,6 +191,95 @@
     return { value: isArr ? vals : vals[0], changed, invalid, note };
   };
 
+  /** Parse meshes. withTris=false gives just vertices (for bounding boxes). Cached per zip. */
+  P.geometry = async function (zip, withTris) {
+    this._geo = this._geo || new WeakMap();
+    const c = this._geo.get(zip);
+    if (c && (c.withTris || !withTris)) return c;
+    const files = {};
+    const load = async name => { if (!(name in files)) { const f = zip.file(name); files[name] = f ? parseMeshes(await f.async('string'), withTris) : {}; } return files[name]; };
+    const root = await load('3D/3dmodel.model');
+    const model = await zip.file('3D/3dmodel.model').async('string');
+    const items = [...model.matchAll(/<item\b([^>]*)\/?>/g)].map(m => ({ objectid: (/objectid="(\d+)"/.exec(m[1]) || [])[1], transform: parseT((/transform="([^"]*)"/.exec(m[1]) || [])[1]) }));
+    const objects = {};
+    for (const [id, o] of Object.entries(root)) {
+      const parts = [];
+      if (o.mesh) parts.push({ partId: id, transform: IDENT.slice(), mesh: o.mesh });
+      for (const c of o.comps) {
+        const sub = c.path ? await load(c.path) : root;
+        const so = sub[c.objectid];
+        if (so && so.mesh) parts.push({ partId: c.objectid, transform: c.transform, mesh: so.mesh });
+      }
+      objects[id] = { parts };
+    }
+    const seen = {};
+    for (const it of items) {
+      it.instance = seen[it.objectid] = (seen[it.objectid] === undefined ? 0 : seen[it.objectid] + 1);
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+      for (const p of (objects[it.objectid] || { parts: [] }).parts) {
+        const M = mul(p.transform, it.transform), v = p.mesh.verts;
+        for (let i = 0; i < v.length; i += 3) {
+          const x = v[i] * M[0] + v[i + 1] * M[3] + v[i + 2] * M[6] + M[9];
+          const y = v[i] * M[1] + v[i + 1] * M[4] + v[i + 2] * M[7] + M[10];
+          const z = v[i] * M[2] + v[i + 1] * M[5] + v[i + 2] * M[8] + M[11];
+          if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; if (z > maxZ) maxZ = z;
+        }
+      }
+      it.bbox = isFinite(minX) ? { minX, minY, maxX, maxY, maxZ } : null;
+    }
+    const g = { items, objects, withTris: !!withTris };
+    this._geo.set(zip, g);
+    return g;
+  };
+
+  /** Where each plate's contents go on the U1 bed: shift (plate-local mm) that centres them. */
+  P.plateShifts = function (info, geo) {
+    const srcBed = info.bed, dstBed = this.dstBed(info);
+    const cols = colCount(info.plates), out = [];
+    for (let i = 0; i < info.plates; i++) out.push({ dx: dstBed.cx - srcBed.cx, dy: dstBed.cy - srcBed.cy, fromMesh: false });
+    if (!geo) return out;
+    const boxes = {};
+    for (const it of geo.items) {
+      if (!it.bbox) continue;
+      const plate = info.plateOf[`${it.objectid}:${it.instance}`] ?? 0;
+      const o = plateOrigin(plate, cols, srcBed);
+      const b = boxes[plate] = boxes[plate] || { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+      b.minX = Math.min(b.minX, it.bbox.minX - o.x); b.maxX = Math.max(b.maxX, it.bbox.maxX - o.x);
+      b.minY = Math.min(b.minY, it.bbox.minY - o.y); b.maxY = Math.max(b.maxY, it.bbox.maxY - o.y);
+    }
+    for (const [p, b] of Object.entries(boxes)) {
+      if (!out[p]) continue;
+      out[p] = { dx: dstBed.cx - (b.minX + b.maxX) / 2, dy: dstBed.cy - (b.minY + b.maxY) / 2, fromMesh: true, w: b.maxX - b.minX, d: b.maxY - b.minY,
+        box: { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY } };
+    }
+    return out;
+  };
+  P.dstBed = function (info) {
+    return bedBox(arr(resolve(this.mach, `Snapmaker U1 (${(info && info.nozzle) || '0.4'} nozzle)`).printable_area));
+  };
+
+  const typeFamily = t => String(t || 'PLA').toUpperCase().split(/[-\s]/)[0];
+  const rgb = h => [1, 3, 5].map(i => parseInt(String(h).slice(i, i + 2), 16) || 0);
+  const colourDist = (a, b) => { const x = rgb(a), y = rgb(b); return (x[0] - y[0]) ** 2 + (x[1] - y[1]) ** 2 + (x[2] - y[2]) ** 2; };
+  P.presetType = function (preset, customs) {
+    if (preset && preset.kind === 'custom' && customs && customs[preset.name]) return first(Object.assign({}, resolve(this.sm, customs[preset.name].inherits), customs[preset.name]).filament_type);
+    return first(resolve(this.sm, preset && preset.name).filament_type);
+  };
+  /** Map Bambu filaments onto the spools loaded in the U1: same material first, then closest colour. */
+  P.mapToSpools = function (info, spools, customs) {
+    const types = spools.map(s => typeFamily(this.presetType(s.preset, customs)));
+    const map = {};
+    for (const f of info.filaments) {
+      let best = 1, bs = Infinity;
+      spools.forEach((s, i) => {
+        const score = colourDist(f.colour, s.colour) + (types[i] === typeFamily(f.type) ? 0 : 1e6);
+        if (score < bs) { bs = score; best = i + 1; }
+      });
+      map[f.idx] = best;
+    }
+    return map;
+  };
+
   /** Read a Bambu 3mf and describe it. */
   P.inspect = async function (zip) {
     const names = Object.keys(zip.files).filter(n => !zip.files[n].dir);
@@ -177,6 +326,27 @@
     filaments.forEach(f => f.used = (f.uses.parts + f.uses.paint + f.uses.other) > 0);
 
     const plates = [...msText.matchAll(/<plate>([\s\S]*?)<\/plate>/g)].length || 1;
+    const plateOf = {};
+    let pIdx = 0;
+    for (const m of msText.matchAll(/<plate>([\s\S]*?)<\/plate>/g)) {
+      const id = +((/key="plater_id" value="(\d+)"/.exec(m[1]) || [])[1] || (pIdx + 1));
+      for (const inst of m[1].matchAll(/<model_instance>([\s\S]*?)<\/model_instance>/g)) {
+        const o = (/key="object_id" value="(\d+)"/.exec(inst[1]) || [])[1];
+        const i = (/key="instance_id" value="(\d+)"/.exec(inst[1]) || [])[1] || '0';
+        if (o) plateOf[`${o}:${i}`] = id - 1;
+      }
+      pIdx++;
+    }
+    const extruders = {};
+    for (const m of msText.matchAll(/<object id="(\d+)">([\s\S]*?)<\/object>/g)) {
+      const head = m[2].split('<part')[0];
+      const e = { ext: +((/key="extruder" value="(\d+)"/.exec(head) || [])[1] || 1), parts: {} };
+      for (const p of m[2].matchAll(/<part id="(\d+)"[^>]*>([\s\S]*?)<\/part>/g)) {
+        const pe = (/key="extruder" value="(\d+)"/.exec(p[2]) || [])[1];
+        if (pe) e.parts[p[1]] = +pe;
+      }
+      extruders[m[1]] = e;
+    }
     const nozzle = String(first(cfg.nozzle_diameter) || '0.4');
     const layerHeight = parseFloat(cfg.layer_height) || 0.2;
     const embedded = names.filter(n => /^Metadata\/(print_setting|filament_settings|machine_settings|process_settings)_\d+\.config$/i.test(n));
@@ -186,13 +356,22 @@
       cfg, app, isBambu: /^BambuStudio/i.test(app) || /BBL|Bambu/.test(String(cfg.printer_settings_id || '')),
       printer: String(cfg.printer_settings_id || ''), process: String(cfg.print_settings_id || ''),
       nozzle: ['0.2', '0.4', '0.6', '0.8'].includes(nozzle) ? nozzle : '0.4', layerHeight, plates, filaments, nFil,
-      paintedTris, paintErrors, embedded, gcodeFiles, processDiffs: diffs, bed: bedBox(arr(cfg.printable_area)),
+      paintedTris, paintErrors, embedded, gcodeFiles, processDiffs: diffs, bed: bedBox(arr(cfg.printable_area)), plateOf, extruders,
       objects: [...msText.matchAll(/<object id=/g)].length,
     };
   };
 
   /** Default plan: slot mapping, slot presets, process. */
-  P.defaultPlan = function (info) {
+  P.defaultPlan = function (info, setup, customs) {
+    if (setup && Array.isArray(setup.spools) && setup.spools.length === SLOTS && setup.spools.every(s => s && s.preset)) {
+      const nozzle = setup.nozzle || info.nozzle;
+      const slots = setup.spools.map(s => ({ colour: s.colour, preset: Object.assign({}, s.preset), fromSetup: true }));
+      const procs = this.processesFor(nozzle);
+      const lh = info.layerHeight;
+      const process = procs.find(n => Math.abs(parseFloat(n) - lh) < 1e-6 && /Standard/.test(n))
+        || procs.filter(n => /Standard/.test(n)).sort((a, b) => Math.abs(parseFloat(a) - lh) - Math.abs(parseFloat(b) - lh))[0] || procs[0];
+      return { map: this.mapToSpools(info, slots, customs), slots, nozzle, process, recenter: true, keepProcess: true, procOverrides: {}, hotend: setup.hotend || 'standard', fromSetup: true };
+    }
     const used = info.filaments.filter(f => f.used);
     const map = {};
     const slots = [];
@@ -373,9 +552,12 @@
       pi++;
     }
     const wtw = parseFloat(cfg.prime_tower_width) || 30;
-    if (plan.recenter !== false) {
+    let geo = null;
+    if (plan.recenter !== false) { try { geo = await this.geometry(zipIn, false); } catch (e) { report.warnings.push('Could not measure the models (' + e.message + '); plates were shifted by the bed size difference only.'); } }
+    const shifts = plan.recenter !== false ? this.plateShifts(info, geo) : null;
+    if (shifts) {
       const seen = {};
-      let outside = 0, moved = 0;
+      let moved = 0;
       model = model.replace(/<item\b[^>]*>/g, tag => {
         const oid = (/objectid="(\d+)"/.exec(tag) || [])[1];
         const tm = /transform="([^"]*)"/.exec(tag);
@@ -384,25 +566,40 @@
         const plate = plateOf[`${oid}:${inst}`] ?? 0;
         const t = tm[1].trim().split(/\s+/).map(Number);
         if (t.length !== 12 || t.some(isNaN)) return tag;
-        const os = plateOrigin(plate, cols, srcBed), od = plateOrigin(plate, cols, dstBed);
-        const lx = t[9] - os.x - srcBed.cx, ly = t[10] - os.y - srcBed.cy;
-        t[9] = od.x + dstBed.cx + lx; t[10] = od.y + dstBed.cy + ly;
-        if (Math.abs(lx) > dstBed.w / 2 - 3 || Math.abs(ly) > dstBed.d / 2 - 3) outside++;
+        const os = plateOrigin(plate, cols, srcBed), od = plateOrigin(plate, cols, dstBed), sh = shifts[plate] || shifts[0];
+        t[9] = t[9] - os.x + sh.dx + od.x; t[10] = t[10] - os.y + sh.dy + od.y;
         moved++;
         return tag.replace(tm[0], `transform="${t.map(v => +v.toFixed(9)).join(' ')}"`);
       });
-      if (moved) report.fixed.push(`Moved ${moved} object${moved > 1 ? 's' : ''} so ${nPlates > 1 ? 'each plate is' : 'the plate is'} centred on the U1's ${dstBed.w}×${dstBed.d} mm bed (was ${srcBed.w}×${srcBed.d} mm).`);
-      if (outside) report.warnings.push(`${outside} object${outside > 1 ? 's sit' : ' sits'} near or past the U1 bed edge. Use Arrange (A) in Snapmaker Orca on that plate.`);
+      if (moved) report.fixed.push(`Centred ${nPlates > 1 ? 'each plate\'s models' : 'the models'} on the U1's ${dstBed.w}×${dstBed.d} mm bed${geo ? ' using their real size' : ''} (was a ${srcBed.w}×${srcBed.d} mm bed).`);
+      shifts.forEach((sh, i) => {
+        if (!sh.fromMesh) return;
+        const p = nPlates > 1 ? `Plate ${i + 1}: models` : 'Models';
+        if (sh.w > dstBed.w || sh.d > dstBed.d) report.warnings.push(`${p} take ${Math.round(sh.w)}×${Math.round(sh.d)} mm, more than the U1 bed (${dstBed.w}×${dstBed.d} mm). Move some to another plate in Snapmaker Orca.`);
+        else if (sh.w > dstBed.w - 7 || sh.d > dstBed.d - 7) report.warnings.push(`${p} take ${Math.round(sh.w)}×${Math.round(sh.d)} mm and come within 3.5 mm of the bed edge. Spiral Z-hop may warn; use Arrange (A) or another Z-hop type.`);
+      });
     }
     // prime tower position per plate (plate-local coordinates)
     const sx = arr(srcCfg.wipe_tower_x) || [], sy = arr(srcCfg.wipe_tower_y) || [];
     const wx = [], wy = [];
     for (let i = 0; i < nPlates; i++) {
       let x = parseFloat(sx[i] ?? sx[0]), y = parseFloat(sy[i] ?? sy[0]);
+      const sh = shifts && (shifts[i] || shifts[0]);
       if (isNaN(x) || isNaN(y)) { x = parseFloat(first(this.tpl.wipe_tower_x)) || 13; y = parseFloat(first(this.tpl.wipe_tower_y)) || 211; }
-      else if (plan.recenter !== false) { x += dstBed.cx - srcBed.cx; y += dstBed.cy - srcBed.cy; }
-      x = Math.min(Math.max(x, dstBed.minX + 2), dstBed.maxX - wtw - 2);
-      y = Math.min(Math.max(y, dstBed.minY + 2), dstBed.maxY - wtw - 10);
+      else if (sh) { x += sh.dx; y += sh.dy; }
+      const clamp = (px, py) => [Math.min(Math.max(px, dstBed.minX + 2), dstBed.maxX - wtw - 2), Math.min(Math.max(py, dstBed.minY + 2), dstBed.maxY - wtw * 1.5 - 2)];
+      [x, y] = clamp(x, y);
+      // keep the prime tower clear of the models (tower ≈ width × 1.5·width)
+      if (sh && sh.box) {
+        const b = { minX: sh.box.minX + sh.dx - 5, maxX: sh.box.maxX + sh.dx + 5, minY: sh.box.minY + sh.dy - 5, maxY: sh.box.maxY + sh.dy + 5 };
+        const hits = (px, py) => px < b.maxX && px + wtw > b.minX && py < b.maxY && py + wtw * 1.5 > b.minY;
+        if (hits(x, y)) {
+          const cands = [[dstBed.minX + 5, dstBed.maxY - wtw * 1.5 - 5], [dstBed.maxX - wtw - 5, dstBed.maxY - wtw * 1.5 - 5], [dstBed.minX + 5, dstBed.minY + 5], [dstBed.maxX - wtw - 5, dstBed.minY + 5]];
+          const free = cands.find(([px, py]) => !hits(px, py));
+          if (free) { [x, y] = free; report.fixed.push(`${nPlates > 1 ? `Plate ${i + 1}: moved` : 'Moved'} the prime tower to a corner clear of the models.`); }
+          else report.warnings.push(`${nPlates > 1 ? `Plate ${i + 1}: the` : 'The'} prime tower may touch the models. Move it in Snapmaker Orca.`);
+        }
+      }
       wx.push(String(+x.toFixed(3))); wy.push(String(+y.toFixed(3)));
     }
     cfg.wipe_tower_x = wx; cfg.wipe_tower_y = wy;
@@ -463,7 +660,43 @@
     return { zip: out, report };
   };
 
-  const api = { Converter3MF, remapPaint, bedBox, colCount, plateOrigin, SLOTS };
+  /** Triangles of one plate in U1 bed coordinates, coloured by U1 slot (for the 3D preview). */
+  P.previewMesh = async function (zip, info, plan, plate) {
+    const geo = await this.geometry(zip, true);
+    const srcBed = info.bed, dstBed = this.dstBed({ nozzle: plan.nozzle });
+    const cols = colCount(info.plates);
+    const shifts = this.plateShifts(info, geo);
+    const sh = plan.recenter !== false ? (shifts[plate] || shifts[0]) : { dx: 0, dy: 0 };
+    const o = plateOrigin(plate, cols, srcBed);
+    const slotOf = idx => +(plan.map[idx] || 1);
+    let n = 0;
+    const its = geo.items.filter(it => (info.plateOf[`${it.objectid}:${it.instance}`] ?? 0) === plate);
+    for (const it of its) for (const p of geo.objects[it.objectid].parts) n += p.mesh.tris ? p.mesh.tris.length / 3 : 0;
+    const pos = new Float32Array(n * 9), slot = new Uint8Array(n);
+    let t = 0;
+    for (const it of its) {
+      const ex = info.extruders[it.objectid] || { ext: 1, parts: {} };
+      for (const p of geo.objects[it.objectid].parts) {
+        const M = mul(p.transform, it.transform), v = p.mesh.verts, tr = p.mesh.tris;
+        if (!tr) continue;
+        const partSlot = slotOf(ex.parts[p.partId] || ex.ext || 1);
+        for (let k = 0; k < tr.length; k += 3, t++) {
+          for (let c = 0; c < 3; c++) {
+            const i = tr[k + c] * 3, b = t * 9 + c * 3;
+            pos[b] = v[i] * M[0] + v[i + 1] * M[3] + v[i + 2] * M[6] + M[9] - o.x + sh.dx;
+            pos[b + 1] = v[i] * M[1] + v[i + 1] * M[4] + v[i + 2] * M[7] + M[10] - o.y + sh.dy;
+            pos[b + 2] = v[i] * M[2] + v[i + 1] * M[5] + v[i + 2] * M[8] + M[11];
+          }
+          const pc = p.mesh.paint && p.mesh.paint[k / 3];
+          const st = pc ? paintDominant(pc) : 0;
+          slot[t] = st > 0 ? slotOf(st) : partSlot;
+        }
+      }
+    }
+    return { positions: pos, slots: slot, bed: dstBed, triangles: n };
+  };
+
+  const api = { Converter3MF, remapPaint, paintDominant, bedBox, colCount, plateOrigin, SLOTS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.B2U3 = api;
 })(typeof window !== 'undefined' ? window : globalThis);

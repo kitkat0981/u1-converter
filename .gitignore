@@ -3,3 +3,4 @@ dist/
 dist-embedded/
 test/out/
 tools/upstream/
+__pycache__/

@@ -144,6 +144,35 @@
   .rowbtns{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
   .muted{color:var(--muted);font-size:13.5px}
   .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--raised);border:1px solid var(--line-strong);color:var(--ink);padding:10px 16px;border-radius:8px;font-size:14px;box-shadow:var(--shadow-pop);opacity:0;transition:.2s;pointer-events:none;z-index:30}
+  .libbox{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin:14px 0;padding:0 14px}
+  .libbox>summary{padding:12px 0;font-weight:600;color:var(--ink);font-size:14.5px}
+  .libctl{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .libctl input[type=search]{flex:1 1 220px;font:inherit;font-size:13.5px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)}
+  .libctl select{width:auto}
+  .liblist{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--bg)}
+  .liblist h5{margin:10px 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .liblist label{display:inline-flex;gap:6px;align-items:center;font-size:13.5px;margin:2px 14px 2px 0;cursor:pointer}
+  .liblist label small{color:var(--muted)}
+  .tag{font-size:11px;border-radius:99px;padding:1px 7px;background:var(--u1-soft);color:var(--u1-text);margin-left:4px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:12px 0}
+  .panel h3{margin:0 0 6px;font-size:15px}
+  .steps2{counter-reset:st;margin:0;padding:0;list-style:none}
+  .steps2>li{counter-increment:st;position:relative;padding:0 0 0 38px;margin:0 0 6px}
+  .steps2>li::before{content:counter(st);position:absolute;left:0;top:10px;width:24px;height:24px;border-radius:50%;background:var(--u1);color:var(--on-u1);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+  .steps2 details{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:0 14px}
+  .steps2 summary{padding:11px 0;font-weight:600;font-size:14.5px}
+  .steps2 summary span{font-weight:400;color:var(--muted);font-size:13px}
+  .steps2 ol,.steps2 ul{margin:4px 0 10px;padding-left:20px;font-size:14px}
+  .steps2 li li{margin:3px 0}
+  .calc{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--bg);border-radius:8px;padding:8px 10px;margin:4px 0 12px;font-size:13.5px}
+  .calc input{width:90px;font:inherit;font-size:13.5px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+  .calc b{color:var(--u1-text);font-family:var(--mono)}
+  table.cal input{width:100%;min-width:64px;font-family:var(--mono);font-size:12.5px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+  table.cal input:not(:placeholder-shown){border-color:var(--warn);background:var(--warn-soft);color:var(--warn)}
+  #pv{position:relative;height:440px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+  #pv canvas{display:block;width:100%;height:100%}
+  .pvbar select{width:auto}
+  .pvbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
   .toast.on{opacity:1}
   .pop{position:absolute;z-index:20;width:340px;max-width:calc(100vw - 24px);background:var(--raised);border:1px solid var(--line-strong);border-radius:8px;padding:16px 18px;box-shadow:var(--shadow-pop);display:flex;flex-direction:column;gap:8px}
   .pop[hidden]{display:none}
@@ -179,7 +208,7 @@
     <div class="dir"><span class="tag from">FROM · Bambu Studio</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="color:var(--muted)"><path d="M4 12h14M13 6l6 6-6 6"/></svg><span class="tag to">TO · Snapmaker U1 / Orca</span></div>
   </header>
 
-  <nav class="tabs"><button data-tab="filaments" class="on">Filament presets</button><button data-tab="projects">3MF projects</button></nav>
+  <nav class="tabs"><button data-tab="filaments" class="on">Filament presets</button><button data-tab="projects">3MF projects</button><button data-tab="mine">My U1</button><button data-tab="calibrate">Calibrate</button></nav>
   <div id="tab-filaments">
   <ol class="steps">
     <li class="step s1"><span class="n">1</span><div><div class="t">Export from Bambu Studio <button class="hq" data-help="export" aria-label="Help: exporting from Bambu Studio">?</button></div><p><b>File → Export → Export Preset Bundle</b>, then choose the filament presets. You can also drop the raw <code>.json</code> files from <code>BambuStudio/user/&lt;id&gt;/filament/</code>.</p></div></li>
@@ -194,6 +223,18 @@
     <input type="file" id="file" multiple accept=".json,.zip,.bbsflmt,.bbscfg,.orca_filament" hidden>
   </div>
   <div id="status" class="loading" style="margin-top:8px">Loading preset libraries…</div>
+
+  <details class="libbox" id="libbox">
+    <summary>Add filaments from the Bambu Studio and OrcaSlicer libraries <button class="hq" data-help="library" aria-label="Help: filament libraries">?</button></summary>
+    <p class="muted" style="margin:0 0 10px">For filaments you use but never customised, such as Bambu PLA Matte or SUNLU PETG. Each one keeps what makes it different from a generic filament (temperatures, fans, density…) and is built on the U1's matching generic preset.</p>
+    <div class="libctl">
+      <input type="search" id="libq" placeholder="Search: matte, silk, sunlu, petg…">
+      <select id="libsrc"><option value="">All sources</option><option value="bambu">Bambu Studio</option><option value="orca">Other brands (OrcaSlicer library)</option></select>
+      <select id="libnoz"><option>0.2</option><option selected>0.4</option><option>0.6</option><option>0.8</option></select>
+    </div>
+    <div class="liblist" id="liblist"></div>
+    <div class="rowbtns" style="margin:10px 0 14px"><button class="primary" id="libadd" disabled>Add selected</button><span id="libcount" class="muted"></span></div>
+  </details>
 
   <div class="opts">
     <div class="opt">
@@ -218,6 +259,7 @@
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button id="toggleAll">Expand all</button>
       <button id="clear">Clear</button>
+      <button id="savemine" title="Keep these filaments in this browser for 3MF projects and calibration">Save to My U1</button>
       <button class="primary" id="dl">Download .zip for Snapmaker Orca</button>
     </div>
   </div>
@@ -228,14 +270,30 @@
 
   <div id="tab-projects" hidden>
     <p class="muted" style="margin:14px 0">
-      <button class="hq" data-help="project" aria-label="Help: converting a 3MF project" style="float:right;margin-left:10px">?</button>Convert a Bambu Studio or MakerWorld <code>.3mf</code> project for the U1. Painted colours are kept, the P1S printer and its G-code are replaced with the U1's, and values Snapmaker Orca rejects are corrected. Filaments you converted in the first tab appear in the slot lists below.</p>
-    <div class="drop" id="drop3" tabindex="0" role="button" aria-label="Choose a Bambu .3mf project">
+      <button class="hq" data-help="project" aria-label="Help: converting a 3MF project" style="float:right;margin-left:10px">?</button>Convert a Bambu Studio or MakerWorld <code>.3mf</code> project for the U1. Painted colours are kept, the P1S printer and its G-code are replaced with the U1's, and values Snapmaker Orca rejects are corrected. With spools set in My U1, colours are matched automatically.</p>
+    <div class="drop" id="drop3" tabindex="0" role="button" aria-label="Choose Bambu .3mf projects">
       <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#00AE42" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5"/><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>
-      <strong>Drop a Bambu .3mf project</strong>
-      <span>or click to choose · processed in this page only</span>
-      <input type="file" id="file3" accept=".3mf" hidden>
+      <strong>Drop one or more Bambu .3mf projects</strong>
+      <span>or click to choose · several files are converted together · processed in this page only</span>
+      <input type="file" id="file3" accept=".3mf" multiple hidden>
     </div>
+    <label class="muted" id="usesetupwrap" style="display:flex;gap:8px;align-items:center;margin-top:10px" hidden><input type="checkbox" id="usesetup" checked> Use the spools loaded in my U1 (from <a href="#mine" data-goto="mine">My U1</a>) and match colours automatically</label>
+    <div id="batch"></div>
     <div id="proj"></div>
+    <div class="sec" id="pvsec" hidden>
+      <h3>3D preview <button class="hq" data-help="preview" aria-label="Help: 3D preview">?</button></h3>
+      <div class="pvbar"><button id="pvbtn">Show 3D preview</button><select id="pvplate" hidden></select><span class="muted" id="pvinfo">Shows the models in the U1 slot colours, on the U1 bed. Large painted models can take a few seconds.</span></div>
+      <div id="pv" hidden></div>
+    </div>
+  </div>
+
+  <div id="tab-mine" hidden>
+    <p class="muted" style="margin:14px 0">Kept in this browser only. Use <b>Back up</b> to move it to another browser or computer.</p>
+    <div id="mine"></div>
+  </div>
+
+  <div id="tab-calibrate" hidden>
+    <div id="calib"></div>
   </div>
 
   <section class="ref" id="refsec">
@@ -268,6 +326,7 @@
 <script>/*JSZIP*/</script>
 <script>/*CORE*/</script>
 <script>/*THREEMF*/</script>
+<script>/*THREE*/</script>
 <script>
 const DATA_B64 = "/*DATA*/";
 let conv = null, plans = [], skipped = [], allOpen = false;
@@ -292,6 +351,7 @@ async function loadData(){
   conv = new B2U.Converter(data);
   conv3 = new B2U3.Converter3MF(data, conv);
   printKeyList = data.printKeys.slice().sort();
+  setTimeout(() => showTab(location.hash.slice(1)), 0);
   $('#status').textContent = '';
   $('#foot').innerHTML = `Preset libraries: ${esc(data.meta.bambu)} · ${esc(data.meta.snapmaker)}. ${conv.u1Names.length} U1 filament presets available as bases.`;
 }
@@ -351,7 +411,7 @@ function render(){
     return `<div class="card${plan.open ? ' open' : ''}" data-i="${i}">
       <div class="row">
         <input type="checkbox" class="inc" ${plan.include ? 'checked' : ''} title="Include in download">
-        <div class="src">${esc(plan.srcName)}<small>${plan.parent.name ? 'Parent: ' + esc(plan.parent.name) : plan.parent.baseline ? 'Compared with: ' + esc(plan.parent.baseline) : 'No parent'}</small></div>
+        <div class="src">${esc(plan.srcName)}${mine.filaments[r.name] ? '<span class="tag">in My U1</span>' : ''}<small>${plan.library ? esc(plan.library.sourceLabel) + ' · compared with ' + esc(plan.parent.baseline) : plan.parent.name ? 'Parent: ' + esc(plan.parent.name) : plan.parent.baseline ? 'Compared with: ' + esc(plan.parent.baseline) : 'No parent'}</small></div>
         <div><span class="lbl">U1 base</span><select class="base">${bases.map(b => `<option${b === plan.base ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select></div>
         <div><span class="lbl">Nozzle</span><select class="nz">${nz.map(x => `<option value="${x}"${x === plan.nozzle ? ' selected' : ''}>${x} mm</option>`).join('')}</select></div>
         <div><span class="lbl">New name</span><input type="text" class="nm" value="${esc(plan.outName)}"></div>
@@ -381,7 +441,10 @@ $('#list').addEventListener('change', e => {
   const p = plans[+card.dataset.i];
   if (e.target.classList.contains('inc')) p.include = e.target.checked;
   if (e.target.classList.contains('base')) { p.base = e.target.value; const nz = conv.u1NozzlesFor(p.base); if (!nz.includes(p.nozzle)) p.nozzle = nz.includes('0.4') ? '0.4' : nz[0]; }
-  if (e.target.classList.contains('nz')) p.nozzle = e.target.value;
+  if (e.target.classList.contains('nz')) {
+    if (p.library) { const keep = { include: p.include, overrides: p.overrides, open: p.open, base: p.base }; const np = conv.analyseLibrary(p.library.id, e.target.value); Object.assign(np, keep); plans[+card.dataset.i] = np; render(); return; }
+    p.nozzle = e.target.value;
+  }
   if (e.target.classList.contains('nm')) p.outName = e.target.value.trim() || p.outName;
   if (e.target.classList.contains('ov')) {
     const k = e.target.dataset.k;
@@ -438,17 +501,80 @@ async function save(filename, data){
 }
 $('#dl').onclick = async () => {
   const z = new JSZip();
-  for (const { plan, r } of window.__res) if (plan.include) z.file(r.name.replace(/[\\/:*?"<>|]/g, '_') + '.json', JSON.stringify(r.preset, null, 4));
+  for (const { plan, r } of window.__res) if (plan.include) z.file(safeName(r.name) + '.json', JSON.stringify(r.preset, null, 4));
+  saveToMine(true);
   await save('snapmaker-u1-filaments.zip', await z.generateAsync({ type: 'blob' }));
+};
+$('#savemine').onclick = () => saveToMine(false);
+const safeName = n => String(n).replace(/[\\/:*?"<>|]/g, '_');
+
+// ===================== My U1 store (this browser) =====================
+const STORE_KEY = 'u1conv.v1';
+function blankMine(){ return { filaments: {}, spools: null, nozzle: '0.4', hotend: 'standard', calib: {}, calibDone: {}, useSetup: true }; }
+function loadMine(){ try { return Object.assign(blankMine(), JSON.parse(localStorage.getItem(STORE_KEY) || '{}')); } catch { return blankMine(); } }
+let mine = loadMine();
+function saveMine(){ try { localStorage.setItem(STORE_KEY, JSON.stringify(mine)); return true; } catch { toast('This browser blocked saving. Use Back up in My U1 instead.'); return false; } }
+function saveToMine(quiet){
+  let n = 0;
+  for (const { plan, r } of (window.__res || [])) if (plan.include) { mine.filaments[r.name] = r.preset; n++; }
+  if (n && saveMine() && !quiet) toast(`Saved ${n} filament${n > 1 ? 's' : ''} to My U1`);
+  render();
+}
+const presetNozzle = p => ((arr0(p.compatible_printers).map(x => (/\((\d\.\d) nozzle\)/.exec(x) || [])[1]).find(Boolean)) || '0.4');
+const arr0 = v => Array.isArray(v) ? v : (v === undefined ? [] : [v]);
+
+// ===================== Library picker =====================
+function renderLib(){
+  if (!conv) return;
+  const q = $('#libq').value.trim().toLowerCase(), src = $('#libsrc').value, noz = $('#libnoz').value;
+  const sel = new Set([...document.querySelectorAll('#liblist input:checked')].map(x => x.value));
+  const list = conv.library().list.filter(e => (!src || e.source === src) && (!q || (e.vendor + ' ' + e.product + ' ' + e.type).toLowerCase().includes(q)));
+  const groups = {};
+  for (const e of list) (groups[e.vendor + ' — ' + e.sourceLabel] = groups[e.vendor + ' — ' + e.sourceLabel] || []).push(e);
+  const have = new Set(Object.keys(mine.filaments));
+  $('#liblist').innerHTML = Object.entries(groups).map(([g, es]) => `<h5>${esc(g)}</h5>${es.map(e => {
+    const out = e.product + ' @U1' + (noz !== '0.4' ? ' ' + noz : '');
+    return `<label><input type="checkbox" value="${esc(e.id)}"${sel.has(e.id) ? ' checked' : ''}>${esc(e.product)} <small>${esc(e.type)}${e.source === 'bambu' && !e.nozzles[noz] ? ' · no ' + noz + ' profile' : ''}</small>${have.has(out) ? '<span class="tag">in My U1</span>' : ''}</label>`;
+  }).join('')}`).join('') || '<p class="muted">Nothing matches.</p>';
+  libCount();
+}
+function libCount(){ const n = document.querySelectorAll('#liblist input:checked').length; $('#libadd').disabled = !n; $('#libcount').textContent = n ? `${n} selected` : ''; }
+$('#libq').addEventListener('input', renderLib);
+$('#libsrc').addEventListener('change', renderLib);
+$('#libnoz').addEventListener('change', renderLib);
+$('#liblist').addEventListener('change', libCount);
+$('#libbox').addEventListener('toggle', () => { if ($('#libbox').open) renderLib(); });
+$('#libadd').onclick = () => {
+  const noz = $('#libnoz').value;
+  const ids = [...document.querySelectorAll('#liblist input:checked')].map(x => x.value);
+  const known = new Set(plans.filter(p => p.library).map(p => p.library.id + '|' + p.nozzle));
+  let n = 0;
+  for (const id of ids) {
+    if (known.has(id + '|' + noz)) continue;
+    const plan = conv.analyseLibrary(id, noz);
+    plan.include = true;
+    plans.push(plan); n++;
+  }
+  document.querySelectorAll('#liblist input:checked').forEach(x => x.checked = false);
+  libCount();
+  render();
+  toast(n ? `Added ${n} filament${n > 1 ? 's' : ''} below` : 'Already in the list');
+  $('#bar').scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 
 
 // ===================== 3MF projects =====================
-let conv3 = null, proj = null, printKeyList = [];
+let conv3 = null, proj = null, projs = [], printKeyList = [];
 function customFilaments(nozzle){
   const out = {};
+  for (const [n, p] of Object.entries(mine.filaments)) if (presetNozzle(p) === nozzle) out[n] = p;
   for (const x of (window.__res || [])) if (x.plan.include && x.r.nozzle === nozzle) out[x.r.name] = x.r.preset;
   return out;
+}
+const setupReady = () => !!(mine.spools && mine.spools.length === 4 && mine.spools.every(s => s && s.preset && s.preset.name));
+function planFor(info){
+  const useSetup = setupReady() && $('#usesetup').checked;
+  return conv3.defaultPlan(info, useSetup ? { spools: mine.spools, nozzle: mine.nozzle, hotend: mine.hotend } : null, customFilaments(useSetup ? mine.nozzle : info.nozzle));
 }
 function filamentOptions(nozzle, sel){
   const customs = Object.keys(customFilaments(nozzle));
@@ -457,16 +583,73 @@ function filamentOptions(nozzle, sel){
   return (customs.length ? `<optgroup label="Your converted filaments">${customs.map(n => opt('custom', n, n)).join('')}</optgroup>` : '')
     + `<optgroup label="Snapmaker U1 presets">${sys.map(([n, b]) => opt('system', n, b)).join('')}</optgroup>`;
 }
-async function openProject(file){
+async function openProject(file){ return openProjects([file]); }
+async function openProjects(files){
   if (!conv3) { toast('Still loading, try again in a second'); return; }
-  $('#proj').innerHTML = '<p class="muted">Reading project…</p>';
-  try {
-    const zip = await JSZip.loadAsync(await file.arrayBuffer());
-    const info = await conv3.inspect(zip);
-    proj = { file, zip, info, plan: conv3.defaultPlan(info), report: null };
-    renderProj();
-  } catch (e) { proj = null; $('#proj').innerHTML = `<p class="skipped" style="color:var(--drop)">Could not read ${esc(file.name)}: ${esc(e.message)}</p>`; }
+  files = files.filter(f => /\.3mf$/i.test(f.name));
+  if (!files.length) { toast('Drop .3mf files'); return; }
+  closePreview();
+  $('#proj').innerHTML = ''; $('#batch').innerHTML = `<p class="muted">Reading ${files.length} project${files.length > 1 ? 's' : ''}…</p>`;
+  for (const file of files) {
+    try {
+      const zip = await JSZip.loadAsync(await file.arrayBuffer());
+      const info = await conv3.inspect(zip);
+      projs.push({ file, zip, info, plan: planFor(info), report: null });
+    } catch (e) { projs.push({ file, error: e.message }); }
+  }
+  const ok = projs.filter(p => !p.error);
+  proj = projs.length === 1 && ok.length === 1 ? ok[0] : null;
+  renderAllProjects();
 }
+function renderAllProjects(){
+  $('#usesetupwrap').hidden = !setupReady();
+  if (proj) { $('#batch').innerHTML = ''; renderProj(); }
+  else { $('#proj').innerHTML = ''; $('#pvsec').hidden = true; renderBatch(); }
+}
+function renderBatch(){
+  if (!projs.length) { $('#batch').innerHTML = ''; return; }
+  const sw = c => `<span class="sw" style="background:${esc(c)}"></span>`;
+  $('#batch').innerHTML = `<div class="sec"><h3>${projs.length} project${projs.length > 1 ? 's' : ''} <button class="hq" data-help="batch" aria-label="Help: converting several projects">?</button></h3>
+    <div class="card"><table>
+      <tr><th>File</th><th>Colours → U1 slots</th><th>Process</th><th>Result</th><th></th></tr>
+      ${projs.map((p, i) => p.error ? `<tr><td style="overflow-wrap:anywhere">${esc(p.file.name)}</td><td colspan="3" style="color:var(--drop)">${esc(p.error)}</td><td><button class="bdel" data-i="${i}">Remove</button></td></tr>` : `<tr>
+        <td style="overflow-wrap:anywhere">${esc(p.file.name)}<div class="muted">${p.info.plates} plate${p.info.plates > 1 ? 's' : ''} · ${p.info.objects} object${p.info.objects > 1 ? 's' : ''}</div></td>
+        <td>${p.info.filaments.filter(f => f.used).map(f => `${sw(f.colour)}→T${p.plan.map[f.idx]} ${sw(p.plan.slots[p.plan.map[f.idx] - 1].colour)}`).join('<br>')}</td>
+        <td class="muted">${esc(p.plan.process.replace(/ @Snapmaker U1.*$/, ''))}</td>
+        <td class="muted">${p.report ? `${p.report.fixed.length} fixes${p.report.warnings.length ? `, <span style="color:var(--warn)">${p.report.warnings.length} to check</span>` : ''}` : '—'}</td>
+        <td style="white-space:nowrap"><button class="bedit" data-i="${i}">Edit</button> <button class="bdel" data-i="${i}">Remove</button></td></tr>`).join('')}
+    </table></div>
+    <div class="rowbtns"><button class="primary" id="ball">Convert all &amp; download .zip</button><button id="bclear">Clear</button><span id="bstatus" class="muted"></span></div>
+    ${projs.some(p => p.report && p.report.warnings.length) ? `<div class="sec"><h3>Check in Snapmaker Orca</h3><ul class="rep w">${projs.filter(p => p.report).flatMap(p => p.report.warnings.map(w => `<li><b>${esc(p.file.name)}:</b> ${esc(w)}</li>`)).join('')}</ul></div>` : ''}
+  </div>`;
+}
+$('#batch').addEventListener('click', async e => {
+  const t = e.target, i = +t.dataset.i;
+  if (t.classList.contains('bedit')) { proj = projs[i]; renderAllProjects(); window.scrollTo({ top: $('#proj').offsetTop - 20, behavior: 'smooth' }); }
+  if (t.classList.contains('bdel')) { projs.splice(i, 1); if (projs.filter(p => !p.error).length === 1 && projs.length === 1) proj = projs[0]; renderAllProjects(); }
+  if (t.id === 'bclear') { projs = []; proj = null; closePreview(); renderAllProjects(); }
+  if (t.id === 'ball') {
+    t.disabled = true;
+    const z = new JSZip();
+    const ok = projs.filter(p => !p.error);
+    let k = 0;
+    for (const p of ok) {
+      $('#bstatus').textContent = `Converting ${++k} of ${ok.length}: ${p.file.name}…`;
+      await new Promise(r => setTimeout(r, 30));
+      try {
+        const { zip, report } = await conv3.convert(p.zip, p.info, p.plan, { JSZip, customs: customFilaments(p.plan.nozzle) });
+        p.report = report;
+        z.file(p.file.name.replace(/\.3mf$/i, '') + '-U1.3mf', await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 6 } }));
+      } catch (err) { p.report = { fixed: [], warnings: ['Conversion failed: ' + err.message] }; }
+    }
+    $('#bstatus').textContent = 'Packing…';
+    const blob = await z.generateAsync({ type: 'blob', compression: 'STORE' });
+    renderBatch();
+    await save(`U1-projects-${new Date().toISOString().slice(0, 10)}.zip`, blob);
+  }
+});
+$('#usesetup').addEventListener('change', () => { mine.useSetup = $('#usesetup').checked; saveMine(); for (const p of projs) if (!p.error) p.plan = planFor(p.info); renderAllProjects(); });
+document.addEventListener('click', e => { const g = e.target.closest('[data-goto]'); if (g) { e.preventDefault(); try { location.hash = g.dataset.goto; } catch {} showTab(g.dataset.goto); } });
 function fixSlotPresets(){
   const { plan, info } = proj, cust = customFilaments(plan.nozzle);
   plan.slots.forEach(s => {
@@ -484,6 +667,10 @@ function renderProj(){
   if (!proj) { el.innerHTML = ''; return; }
   const { info, plan } = proj;
   fixSlotPresets();
+  $('#pvsec').hidden = false;
+  $('#pvplate').innerHTML = Array.from({ length: info.plates }, (_, i) => `<option value="${i}"${(proj.pvPlate || 0) === i ? ' selected' : ''}>Plate ${i + 1}</option>`).join('');
+  $('#pvplate').hidden = info.plates < 2 || !pv.on;
+  const backBtn = projs.length > 1 ? `<div class="rowbtns" style="margin:12px 0 0"><button id="p-back">← All ${projs.length} files</button><span class="muted">Editing ${esc(proj.file.name)}${plan.fromSetup ? ' · slots from My U1' : ''}</span></div>` : (plan.fromSetup ? '<p class="muted" style="margin:10px 0 0">Slots taken from the spools in My U1, matched by material and colour.</p>' : '');
   const pc = conv3.processCarry(info, plan.process);
   const ov = plan.procOverrides;
   const rows = pc.carry.map(c => ({ ...c, removed: ov[c.key] === null, manual: ov[c.key] !== undefined && ov[c.key] !== null }));
@@ -494,7 +681,7 @@ function renderProj(){
   rows.sort((a, b) => a.key.localeCompare(b.key));
   const procs = conv3.processesFor(plan.nozzle);
   const mappedTo = s => info.filaments.filter(f => +plan.map[f.idx] === s);
-  el.innerHTML = `
+  el.innerHTML = backBtn + `
   <div class="sum">
     <div><span>File</span>${esc(proj.file.name)}</div>
     <div><span>Made for</span>${esc(info.printer || 'unknown printer')}</div>
@@ -574,6 +761,7 @@ $('#proj').addEventListener('change', e => {
   else if (t.id === 'p-addk') return;
   proj.report = null;
   renderProj();
+  refreshPreview();
 });
 $('#proj').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'p-addk') { e.preventDefault(); $('#p-addb').click(); } });
 $('#proj').addEventListener('click', async e => {
@@ -588,7 +776,8 @@ $('#proj').addEventListener('click', async e => {
     plan.procOverrides[k] = Array.isArray(cur) ? cur.slice() : (cur ?? '');
     renderProj();
   }
-  if (t.id === 'p-clear') { proj = null; renderProj(); }
+  if (t.id === 'p-clear') { if (projs.length > 1) { projs.splice(projs.indexOf(proj), 1); } else projs = []; proj = projs.length === 1 && !projs[0].error ? projs[0] : null; closePreview(); renderAllProjects(); }
+  if (t.id === 'p-back') { proj = null; closePreview(); renderAllProjects(); }
   if (t.id === 'p-go') {
     t.disabled = true; $('#p-status').textContent = 'Converting…';
     try {
@@ -622,19 +811,295 @@ async function save3mf(name, blob){
 const drop3 = $('#drop3'), fi3 = $('#file3');
 drop3.onclick = () => fi3.click();
 drop3.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') fi3.click(); };
-fi3.onchange = () => { if (fi3.files[0]) openProject(fi3.files[0]); fi3.value = ''; };
+fi3.onchange = () => { if (fi3.files.length) openProjects([...fi3.files]); fi3.value = ''; };
 ['dragenter', 'dragover'].forEach(ev => drop3.addEventListener(ev, e => { e.preventDefault(); drop3.classList.add('over'); }));
 ['dragleave', 'drop'].forEach(ev => drop3.addEventListener(ev, e => { e.preventDefault(); drop3.classList.remove('over'); }));
-drop3.addEventListener('drop', e => { const f = [...e.dataTransfer.files].find(f => /\.3mf$/i.test(f.name)); if (f) openProject(f); else toast('Drop a .3mf file'); });
+drop3.addEventListener('drop', e => openProjects([...e.dataTransfer.files]));
 
-// tabs (#filaments / #projects)
+
+// ===================== 3D preview (three.js) =====================
+const pv = { on: false, renderer: null };
+function disposePv(){
+  if (pv.renderer) { pv.ro && pv.ro.disconnect(); pv.renderer.dispose(); pv.renderer.domElement.remove(); }
+  if (pv.mesh) pv.mesh.geometry.dispose();
+  Object.assign(pv, { renderer: null, scene: null, camera: null, controls: null, mesh: null, group: null, bedKey: null });
+}
+function closePreview(){ pv.on = false; $('#pv').hidden = true; $('#pvbtn').textContent = 'Show 3D preview'; $('#pvplate').hidden = true; disposePv(); }
+function pvRender(){ if (pv.renderer) pv.renderer.render(pv.scene, pv.camera); }
+function initPv(){
+  const el = $('#pv');
+  const r = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  r.setSize(el.clientWidth, el.clientHeight);
+  el.appendChild(r.domElement);
+  const scene = new THREE.Scene();
+  const cam = new THREE.PerspectiveCamera(40, el.clientWidth / el.clientHeight, 1, 5000);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x666666, 0.75));
+  const dl = new THREE.DirectionalLight(0xffffff, 0.55); dl.position.set(200, 400, 300); scene.add(dl);
+  const group = new THREE.Group(); group.rotation.x = -Math.PI / 2; scene.add(group);
+  const controls = new THREE.OrbitControls(cam, r.domElement);
+  controls.addEventListener('change', pvRender);
+  Object.assign(pv, { renderer: r, scene, camera: cam, controls, group, mat: new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }) });
+  pv.ro = new ResizeObserver(() => { if (!pv.renderer) return; r.setSize(el.clientWidth, el.clientHeight); cam.aspect = el.clientWidth / el.clientHeight; cam.updateProjectionMatrix(); pvRender(); });
+  pv.ro.observe(el);
+}
+function pvBed(b){
+  const key = JSON.stringify(b);
+  if (pv.bedKey === key) return;
+  if (pv.bed) pv.group.remove(pv.bed);
+  const g = new THREE.Group();
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(b.w, b.d), new THREE.MeshBasicMaterial({ color: 0x8a8a84, transparent: true, opacity: 0.25 }));
+  plane.position.set(b.cx, b.cy, -0.05); g.add(plane);
+  const pts = [];
+  for (let x = b.minX; x <= b.maxX + 0.01; x += b.w / 9) pts.push(x, b.minY, 0, x, b.maxY, 0);
+  for (let y = b.minY; y <= b.maxY + 0.01; y += b.d / 9) pts.push(b.minX, y, 0, b.maxX, y, 0);
+  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  g.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x8a8a84 })));
+  pv.group.add(g); pv.bed = g; pv.bedKey = key;
+}
+async function refreshPreview(fit){
+  if (!pv.on || !proj || typeof THREE === 'undefined') return;
+  $('#pvinfo').textContent = 'Building preview…';
+  await new Promise(r => setTimeout(r, 20));
+  let m;
+  try { m = await conv3.previewMesh(proj.zip, proj.info, proj.plan, proj.pvPlate || 0); }
+  catch (e) { $('#pvinfo').textContent = 'Preview failed: ' + e.message; return; }
+  if (!pv.renderer) { initPv(); fit = true; }
+  const colours = proj.plan.slots.map(s => new THREE.Color(s.colour));
+  const col = new Float32Array(m.triangles * 9);
+  for (let t = 0; t < m.triangles; t++) {
+    const c = colours[m.slots[t] - 1] || colours[0];
+    for (let k = 0; k < 3; k++) { const b = t * 9 + k * 3; col[b] = c.r; col[b + 1] = c.g; col[b + 2] = c.b; }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(m.positions, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  if (pv.mesh) { pv.group.remove(pv.mesh); pv.mesh.geometry.dispose(); }
+  pv.mesh = new THREE.Mesh(g, pv.mat); pv.group.add(pv.mesh);
+  pvBed(m.bed);
+  if (fit) {
+    const size = Math.max(m.bed.w, m.bed.d);
+    pv.controls.target.set(m.bed.cx, 0, -m.bed.cy);
+    pv.camera.position.set(m.bed.cx, size * 0.75, -m.bed.cy + size * 1.15);
+    pv.controls.update();
+  }
+  pvRender();
+  $('#pvinfo').textContent = `${m.triangles.toLocaleString()} triangles · U1 bed ${m.bed.w}×${m.bed.d} mm · drag to rotate, right-drag to pan, scroll to zoom`;
+}
+$('#pvbtn').onclick = async () => {
+  if (pv.on) { closePreview(); return; }
+  if (typeof THREE === 'undefined') { toast('3D preview is not available in this browser'); return; }
+  pv.on = true; $('#pv').hidden = false; $('#pvbtn').textContent = 'Hide 3D preview';
+  $('#pvplate').hidden = !proj || proj.info.plates < 2;
+  await refreshPreview(true);
+};
+$('#pvplate').onchange = () => { if (proj) { proj.pvPlate = +$('#pvplate').value; refreshPreview(true); } };
+
+// ===================== My U1 =====================
+const DEFAULT_SPOOL_COLOURS = ['#FFFFFF', '#000000', '#E8322E', '#1F6FE0'];
+function spoolsOrBlank(){ return mine.spools && mine.spools.length === 4 ? mine.spools : DEFAULT_SPOOL_COLOURS.map(c => ({ colour: c, preset: null })); }
+function renderMine(){
+  if (!conv) return;
+  const noz = mine.nozzle || '0.4';
+  const spools = spoolsOrBlank();
+  const names = Object.keys(mine.filaments).sort((a, b) => a.localeCompare(b));
+  $('#mine').innerHTML = `
+  <div class="panel"><h3>Spools loaded in my U1 <button class="hq" data-help="spools" aria-label="Help: spools loaded in my U1">?</button></h3>
+    <p class="muted" style="margin:0 0 10px">The 3MF tab maps every project onto these four spools: same material first, then the closest colour.</p>
+    <div class="opts" style="margin:0 0 10px">
+      <div class="opt" style="flex:0 1 200px"><h3>Nozzle</h3><select id="m-noz">${['0.2', '0.4', '0.6', '0.8'].map(n => `<option${n === noz ? ' selected' : ''}>${n}</option>`).join('')}</select></div>
+      <div class="opt" style="flex:0 1 260px"><h3>Hotends</h3><select id="m-hot"><option value="standard"${mine.hotend !== 'high_flow' ? ' selected' : ''}>Standard</option><option value="high_flow"${mine.hotend === 'high_flow' ? ' selected' : ''}>High flow</option></select></div>
+    </div>
+    <div class="slotgrid">${spools.map((s, i) => `
+      <div class="slot"><h4><b>T${i + 1}</b> Toolhead ${i + 1}</h4>
+        <input type="color" class="msc" data-s="${i}" value="${esc((s.colour || '#FFFFFF').slice(0, 7))}">
+        <select class="msp" data-s="${i}" style="margin-top:6px"><option value="">— choose a filament —</option>${filamentOptions(noz, s.preset || {})}</select>
+      </div>`).join('')}</div>
+    ${setupReady() ? '' : '<p class="muted" style="margin:10px 0 0">Choose a filament for all four toolheads to use this setup in the 3MF tab.</p>'}
+  </div>
+
+  <div class="panel"><h3>My filaments (${names.length}) <button class="hq" data-help="myfil" aria-label="Help: my filaments">?</button></h3>
+    ${names.length ? `<p class="muted" style="margin:0 0 10px">Converted filaments saved in this browser. Import them into Snapmaker Orca with <b>File → Import → Import Configs</b>; choose <b>Yes</b> to replace older copies.</p>
+    <div class="card" style="margin:0"><table>
+      <tr><th>Filament</th><th>Built on</th><th>Nozzle</th><th>Calibrated</th><th></th></tr>
+      ${names.map(n => { const p = mine.filaments[n]; return `<tr><td>${esc(n)}</td><td class="muted">${esc(p.inherits || 'standalone')}</td><td>${presetNozzle(p)}</td><td class="muted">${esc(mine.calibDone[n] || '—')}</td>
+        <td style="white-space:nowrap"><button class="m1" data-n="${esc(n)}">.json</button> <button class="mdel" data-n="${esc(n)}">Remove</button></td></tr>`; }).join('')}
+    </table></div>` : '<p class="muted" style="margin:0">None yet. Convert filaments in the <a href="#filaments" data-goto="filaments">Filament presets</a> tab (your Bambu exports or the libraries), then press <b>Save to My U1</b>.</p>'}
+    <div class="rowbtns">
+      ${names.length ? '<button class="primary" id="m-all">Download all for Snapmaker Orca (.zip)</button>' : ''}
+      <button id="m-backup">Back up My U1 (.json)</button>
+      <button id="m-restore">Restore or add filaments…</button><input type="file" id="m-file" accept=".json,.zip" multiple hidden>
+    </div>
+  </div>`;
+}
+$('#mine').addEventListener('change', async e => {
+  const t = e.target;
+  if (t.id === 'm-noz') {
+    const old = mine.nozzle; mine.nozzle = t.value;
+    mine.spools = spoolsOrBlank().map(s => {
+      if (!s.preset) return s;
+      if (s.preset.kind === 'system') { const b = conv.u1BaseOf[s.preset.name]; const n = b && conv.u1Table[b][mine.nozzle]; return { colour: s.colour, preset: n ? { kind: 'system', name: n } : null }; }
+      return customFilaments(mine.nozzle)[s.preset.name] ? s : { colour: s.colour, preset: null };
+    });
+  }
+  if (t.id === 'm-hot') mine.hotend = t.value;
+  if (t.classList.contains('msc') || t.classList.contains('msp')) {
+    mine.spools = spoolsOrBlank().map(x => ({ ...x }));
+    const sp = mine.spools[+t.dataset.s];
+    if (t.classList.contains('msc')) sp.colour = t.value.toUpperCase();
+    else { const [kind, ...rest] = t.value.split('|'); sp.preset = t.value ? { kind, name: rest.join('|') } : null; }
+  }
+  if (t.id === 'm-file') { await restoreMine([...t.files]); t.value = ''; }
+  saveMine(); renderMine();
+});
+$('#mine').addEventListener('click', async e => {
+  const t = e.target;
+  if (t.classList.contains('mdel')) { delete mine.filaments[t.dataset.n]; delete mine.calib[t.dataset.n]; delete mine.calibDone[t.dataset.n]; saveMine(); renderMine(); }
+  if (t.classList.contains('m1')) await save(safeName(t.dataset.n) + '.json', JSON.stringify(mine.filaments[t.dataset.n], null, 4));
+  if (t.id === 'm-all') await downloadMine(Object.keys(mine.filaments), 'my-u1-filaments.zip');
+  if (t.id === 'm-backup') await save(`my-u1-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ u1converter: 1, ...mine }, null, 2));
+  if (t.id === 'm-restore') $('#m-file').click();
+});
+async function downloadMine(names, fname){
+  const z = new JSZip();
+  for (const n of names) z.file(safeName(n) + '.json', JSON.stringify(mine.filaments[n], null, 4));
+  await save(fname, await z.generateAsync({ type: 'blob' }));
+}
+async function restoreMine(files){
+  let n = 0;
+  const addPreset = j => { if (j && j.type === 'filament' && j.name && (j.inherits ? conv.sm.byName[j.inherits] || conv.sm.alias[j.inherits] : true)) { mine.filaments[j.name] = j; n++; } };
+  for (const f of files) {
+    try {
+      if (/\.zip$/i.test(f.name)) { const z = await JSZip.loadAsync(await f.arrayBuffer()); for (const e of Object.values(z.files)) if (!e.dir && /\.json$/i.test(e.name)) addPreset(JSON.parse(await e.async('string'))); continue; }
+      const j = JSON.parse(await f.text());
+      if (j && j.u1converter) { const b = blankMine(); mine = Object.assign(b, j, { filaments: Object.assign({}, mine.filaments, j.filaments || {}) }); delete mine.u1converter; n += Object.keys(j.filaments || {}).length; }
+      else addPreset(j);
+    } catch (err) { toast('Could not read ' + f.name); }
+  }
+  toast(n ? `Added ${n} filament${n > 1 ? 's' : ''}` : 'No U1 filament presets found in those files');
+}
+
+// ===================== Calibrate =====================
+const CF = B2U.CALIB_FIELDS;
+function calc(id, label, fields, formula, unit){
+  return `<div class="calc" data-calc="${id}">${label}: ${fields.map(f => `<label>${f[1]} <input type="number" step="any" data-f="${f[0]}" value="${f[2] ?? ''}"></label>`).join(' ')} → <b data-out>—</b>${unit ? ' ' + unit : ''}</div>`;
+}
+const CALCS = {
+  maxvol: v => v.s + v.h * v.st,
+  pa: v => v.s + v.h * v.st,
+  yolo: v => v.c + v.o,
+  pass: v => v.c * (100 + v.m) / 100,
+  retract: v => v.s + v.h * v.st,
+};
+function renderCalib(){
+  if (!conv) return;
+  const names = Object.keys(mine.filaments).sort((a, b) => a.localeCompare(b));
+  const hot = mine.hotend === 'high_flow' ? 'high_flow' : 'standard';
+  const cal = mine.calib;
+  $('#calib').innerHTML = `
+  <p class="muted" style="margin:14px 0"><button class="hq" data-help="calib" aria-label="Help: calibration" style="float:right;margin-left:10px">?</button>Calibrate each <b>filament type</b> once (for example Bambu PLA Matte), not each colour: colours of the same product print the same. Then enter the results below and download the updated presets.</p>
+  <ol class="steps2">
+    <li><details open><summary>Get ready <span>· once per filament</span></summary>
+      <ul>
+        <li>Import the filament into Snapmaker Orca first (<a href="#mine" data-goto="mine">My U1</a> → Download all → <b>File → Import → Import Configs</b>).</li>
+        <li>Select the <b>Snapmaker U1</b> printer with your nozzle, load the spool in <b>T1</b>, and pick its preset for slot 1 (under <i>Custom</i>).</li>
+        <li>Use a dry spool and a clean plate. Every test below is in the <b>Calibration</b> menu at the top of Snapmaker Orca and prints with the filament selected in slot 1.</li>
+        <li>Do the tests in this order: each one builds on the previous result. Save each result in Snapmaker Orca's filament settings as you go, or note it and enter it below at the end.</li>
+      </ul></details></li>
+    <li><details><summary>Temperature <span>· Calibration → Temperature</span></summary>
+      <ul>
+        <li>Choose the material type and keep the suggested range (for PLA about 230 → 190 °C, PETG 260 → 220 °C).</li>
+        <li>It prints a tower of blocks, each labelled with its temperature.</li>
+        <li>Pick the coolest block that still has smooth walls, clean bridges and good layer bonding (try to snap it), with the least stringing.</li>
+        <li>Enter it as <b>Nozzle temperature</b>. Use the same or 5 °C more for the first layer.</li>
+      </ul></details></li>
+    <li><details><summary>Max volumetric speed <span>· Calibration → Max flowrate</span></summary>
+      <ul>
+        <li>This is the "how fast can the hotend melt it" value: Snapmaker's <i>generic</i> PLA uses a cautious 12 mm³/s; Bambu PLA Basic uses 21 on the P1S. This test finds the real limit on your U1.</li>
+        <li>Set the range wide enough, for example start 5, end 35, step 0.5 for PLA (start 5, end 25 for PETG and Silk).</li>
+        <li>It prints a single-wall tower that prints faster as it gets taller. Find where the wall first gets gaps, rough or under-extruded, and measure that height in mm from the plate.</li>
+      </ul>
+      ${calc('maxvol', 'Result', [['s', 'start', 5], ['st', 'step', 0.5], ['h', 'height (mm)', '']], '', 'mm³/s')}
+      <ul><li>Enter about <b>90 %</b> of that number as <b>Max volumetric speed</b>, to leave a margin.</li></ul></details></li>
+    <li><details><summary>Pressure advance <span>· Calibration → Pressure advance</span></summary>
+      <ul>
+        <li>The U1 runs Klipper. Choose the <b>Pattern</b> method; for direct drive use start 0, end 0.08, step 0.002.</li>
+        <li>It prints rows of chevrons, each labelled with its value. Pick the row with the sharpest corners and even lines (no bulge or gap at the tip).</li>
+        <li>Enter that value as <b>Pressure advance</b>. The converter also switches pressure advance on for that preset.</li>
+        <li>With the <b>Tower</b> method instead, measure the height where corners look best:</li>
+      </ul>
+      ${calc('pa', 'Tower result', [['s', 'start', 0], ['st', 'step per mm', 0.002], ['h', 'height (mm)', '']], '')}
+      </details></li>
+    <li><details><summary>Flow ratio <span>· Calibration → Flow rate</span></summary>
+      <ul>
+        <li>Choose <b>YOLO (Recommended)</b>. It prints flat blocks, each labelled with an offset such as −0.02 or +0.01.</li>
+        <li>Look at the top surfaces in good light: pick the smoothest one, with no gaps between lines and no ridges.</li>
+        <li>New flow ratio = current flow ratio + that offset. The current value is in the table below (Flow ratio column, grey).</li>
+      </ul>
+      ${calc('yolo', 'YOLO', [['c', 'current', ''], ['o', 'offset of best block', '']], '')}
+      <ul><li>With <b>Pass 1 / Pass 2</b> instead, blocks are labelled in percent (Pass 1: −20 to +20, then Pass 2 around the best one):</li></ul>
+      ${calc('pass', 'Pass 1/2', [['c', 'current', ''], ['m', 'block value', '']], '')}
+      </details></li>
+    <li><details><summary>Retraction <span>· Calibration → Retraction test · optional</span></summary>
+      <ul>
+        <li>Only needed if you see stringing. It prints two towers with more retraction as they rise; measure the height where stringing stops.</li>
+      </ul>
+      ${calc('retract', 'Result', [['s', 'start', 0], ['st', 'step per mm', 0.1], ['h', 'height (mm)', '']], '', 'mm')}
+      </details></li>
+    <li><details open><summary>Enter your results <span>· then download and re-import</span></summary>
+      ${names.length ? `
+      <p class="muted" style="margin:4px 0 10px">Grey values are the current ones. Leave a box empty to keep it. Results apply to the <b>${hot === 'high_flow' ? 'high-flow' : 'standard'}</b> hotend (set in <a href="#mine" data-goto="mine">My U1</a>).</p>
+      <div class="card" style="margin:0;overflow:auto"><table class="cal">
+        <tr><th>Filament</th>${CF.map(f => `<th>${esc(f.label)}</th>`).join('')}<th>Last calibrated</th></tr>
+        ${names.map(n => { const cur = conv.presetValues(mine.filaments[n], hot), c = cal[n] || {}; return `<tr><td>${esc(n)}</td>${CF.map(f => `<td><input type="number" step="any" class="cin" data-n="${esc(n)}" data-f="${f.id}" placeholder="${esc(cur[f.id] ?? '')}" value="${esc(c[f.id] ?? '')}"></td>`).join('')}<td class="muted">${esc(mine.calibDone[n] || '—')}</td></tr>`; }).join('')}
+      </table></div>
+      <div class="rowbtns"><button class="primary" id="c-apply">Apply results &amp; download .zip</button><button id="c-clear">Clear entries</button></div>
+      <ul class="rep"><li>Then in Snapmaker Orca: <b>File → Import → Import Configs</b>, pick the zip, answer <b>Yes</b> to replace, and re-select the filament in its slot.</li></ul>`
+      : '<p class="muted">No filaments in My U1 yet. Add them in the <a href="#filaments" data-goto="filaments">Filament presets</a> tab (for example from the Bambu library) and press <b>Save to My U1</b>.</p>'}
+    </details></li>
+  </ol>`;
+  document.querySelectorAll('#calib .calc').forEach(updCalc);
+}
+function updCalc(el){
+  const v = {}; let okAll = true;
+  el.querySelectorAll('input').forEach(i => { const x = parseFloat(i.value); if (isNaN(x)) okAll = false; v[i.dataset.f] = x; });
+  const r = okAll ? CALCS[el.dataset.calc](v) : NaN;
+  el.querySelector('[data-out]').textContent = isNaN(r) ? '—' : (+r.toFixed(4)).toString() + (el.dataset.calc === 'maxvol' ? ` (enter ≈ ${(+(r * 0.9).toFixed(1))})` : '');
+}
+$('#calib').addEventListener('input', e => {
+  const c = e.target.closest('.calc'); if (c) { updCalc(c); return; }
+  if (e.target.classList.contains('cin')) {
+    const { n, f } = e.target.dataset;
+    mine.calib[n] = mine.calib[n] || {};
+    if (e.target.value === '') delete mine.calib[n][f]; else mine.calib[n][f] = e.target.value;
+    if (!Object.keys(mine.calib[n]).length) delete mine.calib[n];
+    saveMine();
+  }
+});
+$('#calib').addEventListener('click', async e => {
+  if (e.target.id === 'c-clear') { mine.calib = {}; saveMine(); renderCalib(); }
+  if (e.target.id === 'c-apply') {
+    const date = new Date().toISOString().slice(0, 10);
+    const names = Object.keys(mine.calib).filter(n => mine.filaments[n]);
+    if (!names.length) { toast('Enter at least one result first'); return; }
+    for (const n of names) { mine.filaments[n] = conv.applyCalibration(mine.filaments[n], mine.calib[n], mine.hotend, date); mine.calibDone[n] = date; delete mine.calib[n]; }
+    saveMine(); renderCalib();
+    await downloadMine(names, `u1-calibrated-${date}.zip`);
+  }
+});
+
+// tabs (#filaments / #projects / #mine / #calibrate)
+const TABS = ['filaments', 'projects', 'mine', 'calibrate'];
 function showTab(name){
-  name = name === 'projects' ? 'projects' : 'filaments';
+  if (!TABS.includes(name)) name = 'filaments';
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
-  $('#tab-filaments').hidden = name !== 'filaments';
-  $('#tab-projects').hidden = name !== 'projects';
+  for (const t of TABS) $('#tab-' + t).hidden = name !== t;
   $('#refsec').hidden = name !== 'filaments';
-  if (name === 'projects' && proj) renderProj();
+  if (!conv) return;
+  if (name === 'projects') { $('#usesetup').checked = mine.useSetup !== false; renderAllProjects(); }
+  if (name === 'mine') renderMine();
+  if (name === 'calibrate') renderCalib();
 }
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { try { location.hash = b.dataset.tab; } catch {} showTab(b.dataset.tab); });
 window.addEventListener('hashchange', () => showTab(location.hash.slice(1)));
@@ -649,9 +1114,15 @@ const HELP = {
   mode: { e: 'Option', t: 'What to carry over', b: `<p><b>Only what I changed</b> is best for most people: the U1 base is already tuned for U1 hardware, and only your own tweaks are added on top.</p><p>Pick <b>Every printing value</b> only if you want the P1S numbers copied as they are.</p>` },
   hotend: { e: 'Option', t: 'Which hotend?', b: `<p>Bambu presets can hold different values for the standard and High Flow hotends. Choose the one you print with on the P1S, so the right values are used where the U1 has only one.</p>` },
   standalone: { e: 'Option', t: 'Linked or standalone', b: `<p><b>Linked</b> keeps your preset tied to the U1 system preset: your changes show in orange in Snapmaker Orca and the rest follows Snapmaker's updates.</p><p><b>Standalone</b> writes every value into the file. Use it if a linked preset doesn't show up after import.</p>` },
-  project: { e: '3MF projects', t: 'Converting a project', b: `<p>Drop a Bambu Studio or MakerWorld <code>.3mf</code>. Then choose which of the U1's 4 toolheads each colour uses, pick the nozzle and process, and press <b>Convert &amp; download</b>.</p><p>Open the result in Snapmaker Orca. Convert your filaments in the first tab first if you want them in the slot lists.</p>` },
+  project: { e: '3MF projects', t: 'Converting a project', b: `<p>Drop one or more Bambu Studio or MakerWorld <code>.3mf</code> files. Then choose which of the U1's 4 toolheads each colour uses, pick the nozzle and process, and press <b>Convert &amp; download</b>.</p><p>Open the result in Snapmaker Orca. Convert your filaments in the first tab first if you want them in the slot lists.</p>` },
   slots: { e: '3MF projects', t: 'U1 toolhead slots', b: `<p>The U1 has 4 toolheads, T1 to T4. For each one, set the colour shown in Snapmaker Orca and the filament preset it will print with.</p>` },
   map: { e: '3MF projects', t: 'Bambu filaments → U1 slots', b: `<p>Each colour in the Bambu project is sent to one U1 slot. Painted areas and parts follow it.</p><p>Projects with more than 4 colours are merged into the closest-coloured slot. Change any of them here.</p>` },
+  library: { e: 'Filament presets', t: 'Filament libraries', b: `<p>Pick filaments you use but never customised: Bambu's own (PLA Matte, Silk+, PETG HF…) or other brands from the OrcaSlicer library (SUNLU, Polymaker, eSUN…).</p><p>Each keeps what makes it different from a generic filament (temperatures, fans, density, flow) and is built on the U1's matching generic preset. Max volumetric speed is scaled, not copied. Calibrate afterwards in the <b>Calibrate</b> tab.</p>` },
+  spools: { e: 'My U1', t: 'Spools loaded in my U1', b: `<p>Tell the converter what is in each toolhead. Every 3MF project is then mapped onto these spools automatically: same material first, then the closest colour.</p><p>You can still change any slot per project.</p>` },
+  myfil: { e: 'My U1', t: 'My filaments', b: `<p>Filaments you converted and saved. They're kept in this browser, are offered in the 3MF slot lists, and get your calibration results.</p><p>Use <b>Back up</b> to keep a copy or move them to another computer.</p>` },
+  calib: { e: 'Calibrate', t: 'Why calibrate?', b: `<p>Converted values come from a different printer. A few short test prints in Snapmaker Orca find the right temperature, speed limit, pressure advance and flow for <i>your</i> U1.</p><p>Do it once per filament type, not per colour. Enter the results at the bottom and re-import the updated presets.</p>` },
+  batch: { e: '3MF projects', t: 'Several projects at once', b: `<p>All files use the same rules: your loaded spools (or the best guess) and the closest U1 process. Press <b>Edit</b> to adjust one file, then <b>Convert all</b> to get every <code>-U1.3mf</code> in one zip.</p>` },
+  preview: { e: '3MF projects', t: '3D preview', b: `<p>Shows the selected plate on the U1 bed in the slot colours, after centring. Check that painted areas got the right colours before opening the file in Snapmaker Orca.</p><p>Painted triangles are shown in their main colour.</p>` },
   process: { e: '3MF projects', t: 'Process settings', b: `<p>These are print settings you changed in the Bambu project. They are applied on top of the U1 process you picked.</p><p>Edit a result, press <b>✕</b> to keep the U1 value instead, or add another setting below.</p>` },
 };
 const pop = $('#pop');
