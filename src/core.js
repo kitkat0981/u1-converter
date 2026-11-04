@@ -104,15 +104,30 @@
     this.sm = makeLib(data.sm);
     this.smKeys = new Set(data.smKeys);
     this.meta = data.meta || {};
-    this.u1Names = Object.keys(data.sm).filter(n => /@U1 \d\.\d nozzle$/.test(n) && data.sm[n].instantiation === 'true').sort();
+    // U1 presets indexed by material ("base") and nozzle, using each preset's compatible printers.
+    // Names differ between Snapmaker Orca versions ("Generic PLA", "Snapmaker PLA Matte @U1",
+    // "Snapmaker ASA @U1 0.4 nozzle"…), so nothing here relies on a naming pattern.
+    this.u1Table = {};
+    this.u1BaseOf = {};
+    for (const [n, j] of Object.entries(data.sm)) {
+      if (!j || j.instantiation !== 'true') continue;
+      const cp = arr(resolve(this.sm, n).compatible_printers) || [];
+      for (const p of cp) {
+        const m = /^Snapmaker U1 \((\d\.\d) nozzle\)$/.exec(p);
+        if (!m) continue;
+        const base = n.replace(/\s*@U1\b.*$/, '').trim();
+        (this.u1Table[base] = this.u1Table[base] || {})[m[1]] = n;
+        this.u1BaseOf[n] = base;
+      }
+    }
+    this.u1Names = Object.keys(this.u1BaseOf).sort();
   }
 
-  Converter.prototype.u1Bases = function () {
-    const s = new Set(this.u1Names.map(n => n.replace(/ @U1 \d\.\d nozzle$/, '')));
-    return [...s].sort();
+  Converter.prototype.u1Bases = function (nozzle) {
+    return Object.keys(this.u1Table).filter(b => !nozzle || this.u1Table[b][nozzle]).sort();
   };
   Converter.prototype.u1NozzlesFor = function (base) {
-    return this.u1Names.filter(n => n.startsWith(base + ' @U1 ')).map(nozzleOf);
+    return Object.keys(this.u1Table[base] || {}).sort();
   };
 
   // Find the Bambu parent; tolerate renamed or missing presets.
@@ -140,7 +155,7 @@
       if (p && !products.includes(p)) products.push(p);
     }
     const tried = [];
-    const has = b => this.u1Names.includes(`${b} @U1 ${nozzle} nozzle`) || this.u1Names.includes(`${b} @U1 0.4 nozzle`);
+    const has = b => !!(this.u1Table[b] && (this.u1Table[b][nozzle] || this.u1Table[b]['0.4']));
     const cands = [];
     const userProd = products.length > 1 ? products.pop() : null;
     for (const p of products) cands.push(`Generic ${p}`, `Snapmaker ${p}`);
@@ -166,9 +181,10 @@
   };
 
   Converter.prototype.targetName = function (base, nozzle) {
-    const n = `${base} @U1 ${nozzle} nozzle`;
-    if (this.u1Names.includes(n)) return { name: n, nozzle };
-    return { name: `${base} @U1 0.4 nozzle`, nozzle: '0.4', nozzleFallback: true };
+    const t = this.u1Table[base] || this.u1Table['Generic PLA'] || {};
+    if (t[nozzle]) return { name: t[nozzle], nozzle };
+    const nz = t['0.4'] ? '0.4' : Object.keys(t)[0];
+    return { name: t[nz], nozzle: nz, nozzleFallback: true };
   };
 
   /**

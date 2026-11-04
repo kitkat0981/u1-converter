@@ -114,7 +114,7 @@ async function bambuProject() {
   });
   const pla = results.find(r => r.name === 'Test PLA @U1');
   await ok('carries only real changes onto the U1 base', () => {
-    assert.strictEqual(pla.target, 'Generic PLA @U1 0.4 nozzle');
+    assert.strictEqual(pla.target, conv.targetName('Generic PLA', '0.4').name);
     assert.deepStrictEqual(pla.preset.nozzle_temperature, ['215']);
     assert.ok(!('filament_start_gcode' in pla.preset));
     assert.ok(pla.dropped.some(d => d.key === 'filament_scarf_seam_type'));

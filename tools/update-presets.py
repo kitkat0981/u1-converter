@@ -5,8 +5,11 @@
 
 Downloads (sparse, shallow) into tools/upstream/:
   - bambulab/BambuStudio          resources/profiles/BBL/filament
-  - Snapmaker/snapmaker-profiles  Snapmaker/{filament,process,machine}
-  - Snapmaker/OrcaSlicer          src/libslic3r (option lists, ranges and enums)
+  - Snapmaker/OrcaSlicer          latest release tag (vX.Y.Z): resources/profiles/Snapmaker
+                                  (U1 filament/process/printer presets as shipped) and src/libslic3r
+                                  (option lists, ranges and enums). Using the release rather than the
+                                  development branch keeps preset names identical to what Snapmaker
+                                  Orca users have installed; otherwise it warns about "customized presets".
   - josuanbn/bl2u1                u1_template.3mf (base project settings, GPL-3.0)
 Then run `npm test` and commit data/presets.json.gz.
 """
@@ -16,8 +19,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UP = os.path.join(ROOT, 'tools', 'upstream')
 REPOS = {
     'bambu': ('https://github.com/bambulab/BambuStudio.git', ['resources/profiles/BBL/filament']),
-    'smp': ('https://github.com/Snapmaker/snapmaker-profiles.git', None),
-    'orca': ('https://github.com/Snapmaker/OrcaSlicer.git', ['src/libslic3r']),
+    'orca': ('https://github.com/Snapmaker/OrcaSlicer.git', ['resources/profiles/Snapmaker', 'src/libslic3r']),
     'bl2u1': ('https://github.com/josuanbn/bl2u1.git', None),
 }
 
@@ -26,11 +28,20 @@ def git(*a, cwd=None):
     return subprocess.run(['git', *a], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
 
 
-def fetch(name):
+def latest_release(url):
+    tags = subprocess.run(['git', 'ls-remote', '--tags', url], check=True, capture_output=True, text=True).stdout
+    vs = sorted({m.group(1) for m in re.finditer(r'refs/tags/(v\d+\.\d+\.\d+)$', tags, re.M)},
+                key=lambda v: tuple(int(x) for x in v[1:].split('.')))
+    return vs[-1]
+
+
+def fetch(name, tag=None):
     url, sparse = REPOS[name]
     d = os.path.join(UP, name)
+    if tag and os.path.isdir(d):
+        subprocess.run(['rm', '-rf', d], check=True)
     if not os.path.isdir(os.path.join(d, '.git')):
-        args = ['clone', '--depth', '1'] + (['--filter=blob:none', '--sparse'] if sparse else []) + [url, d]
+        args = ['clone', '--depth', '1'] + (['--branch', tag] if tag else []) + (['--filter=blob:none', '--sparse'] if sparse else []) + [url, d]
         print('cloning', url)
         git(*args)
         if sparse:
@@ -52,6 +63,27 @@ def load_lib(d):
         if isinstance(j, dict) and 'name' in j:
             lib[j['name']] = j
     return lib
+
+
+U1_PRINTER = re.compile(r'Snapmaker U1 \((\d\.\d) nozzle\)')
+
+
+def resolve(lib, name, depth=0):
+    j = lib.get(name)
+    if not j or depth > 30:
+        return {}
+    out = {}
+    if j.get('inherits'):
+        out.update(resolve(lib, j['inherits'], depth + 1))
+    for inc in j.get('include', []) or []:
+        out.update(resolve(lib, inc, depth + 1))
+    out.update({k: v for k, v in j.items() if k != 'include'})
+    return out
+
+
+def is_u1(lib, name):
+    j = lib[name]
+    return j.get('instantiation') == 'true' and any(U1_PRINTER.search(p) for p in (resolve(lib, name).get('compatible_printers') or []))
 
 
 def chain(lib, pred):
@@ -118,14 +150,20 @@ def option_defs(orca):
 def main():
     os.makedirs(UP, exist_ok=True)
     bambu, bv = fetch('bambu')
-    smp, sv = fetch('smp')
-    orca, ov = fetch('orca')
+    tag = latest_release(REPOS['orca'][0])
+    print('Snapmaker Orca release', tag)
+    orca, ov = fetch('orca', tag)
     bl, blv = fetch('bl2u1')
+    prof = os.path.join(orca, 'resources/profiles/Snapmaker')
+    pver = json.load(open(prof + '.json', encoding='utf-8-sig')).get('version', '?')
 
     bbl = load_lib(os.path.join(bambu, 'resources/profiles/BBL/filament'))
-    sm = chain(load_lib(os.path.join(smp, 'Snapmaker/filament')), lambda n: '@U1' in n)
-    proc = chain(load_lib(os.path.join(smp, 'Snapmaker/process')), lambda n: 'Snapmaker U1' in n)
-    mach = chain(load_lib(os.path.join(smp, 'Snapmaker/machine')), lambda n: n.startswith('Snapmaker U1'))
+    fl = load_lib(os.path.join(prof, 'filament'))
+    pl = load_lib(os.path.join(prof, 'process'))
+    ml = load_lib(os.path.join(prof, 'machine'))
+    sm = chain(fl, lambda n: is_u1(fl, n))
+    proc = chain(pl, lambda n: is_u1(pl, n))
+    mach = chain(ml, lambda n: U1_PRINTER.search(n) is not None)
     keys = option_lists(orca)
     allk = set(keys['filament']) | set(keys['print']) | set(keys['printer'])
     defs = {k: v for k, v in option_defs(orca).items() if k in allk and ('min' in v or 'max' in v or 'enum' in v)}
@@ -137,8 +175,8 @@ def main():
     data = {
         'bbl': bbl, 'sm': sm, 'smProc': proc, 'smMach': mach,
         'smKeys': keys['filament'], 'printKeys': keys['print'], 'printerKeys': keys['printer'], 'defs': defs, 'tpl': tpl,
-        'meta': {'bambu': f'bambulab/BambuStudio {bv}', 'snapmaker': f'Snapmaker/snapmaker-profiles {sv}',
-                 'orca': f'Snapmaker/OrcaSlicer {ov}', 'template': f'josuanbn/bl2u1 {blv}', 'built': datetime.date.today().isoformat()},
+        'meta': {'bambu': f'bambulab/BambuStudio {bv}', 'snapmaker': f'Snapmaker Orca {tag} (profiles {pver})',
+                 'orca': f'Snapmaker/OrcaSlicer {tag} {ov}', 'template': f'josuanbn/bl2u1 {blv}', 'built': datetime.date.today().isoformat()},
     }
     raw = json.dumps(data, separators=(',', ':')).encode()
     out = os.path.join(ROOT, 'data', 'presets.json.gz')

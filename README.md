@@ -31,6 +31,12 @@ Drop a Bambu Studio or MakerWorld `.3mf` project.
 
 Open the downloaded `name-U1.3mf` in Snapmaker Orca.
 
+## Snapmaker Orca version
+
+Built for **Snapmaker Orca 2.4.x**. The U1 preset names are taken from the latest Snapmaker Orca release,
+so converted presets and projects refer to presets your installation already has. Older versions (2.3.x) use
+different names: Snapmaker Orca would then show a "customized presets" warning, and filament imports may be skipped.
+
 ## Self-host (Docker on Ubuntu)
 
 Every push to `main` builds `ghcr.io/kitkat0981/u1-converter:latest` (amd64 + arm64).

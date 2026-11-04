@@ -378,10 +378,10 @@ function customFilaments(nozzle){
 }
 function filamentOptions(nozzle, sel){
   const customs = Object.keys(customFilaments(nozzle));
-  const sys = conv.u1Names.filter(n => n.endsWith(`@U1 ${nozzle} nozzle`));
+  const sys = conv.u1Bases(nozzle).map(b => [conv.u1Table[b][nozzle], b]);
   const opt = (kind, n, label) => `<option value="${kind}|${esc(n)}"${sel.kind === kind && sel.name === n ? ' selected' : ''}>${esc(label)}</option>`;
   return (customs.length ? `<optgroup label="Your converted filaments">${customs.map(n => opt('custom', n, n)).join('')}</optgroup>` : '')
-    + `<optgroup label="Snapmaker U1 presets">${sys.map(n => opt('system', n, n.replace(/ @U1 .*$/, ''))).join('')}</optgroup>`;
+    + `<optgroup label="Snapmaker U1 presets">${sys.map(([n, b]) => opt('system', n, b)).join('')}</optgroup>`;
 }
 async function openProject(file){
   if (!conv3) { toast('Still loading, try again in a second'); return; }
@@ -398,8 +398,9 @@ function fixSlotPresets(){
   plan.slots.forEach(s => {
     if (s.preset.kind === 'custom' && cust[s.preset.name]) return;
     if (s.preset.kind === 'system') {
-      const n = s.preset.name.replace(/@U1 \d\.\d nozzle$/, `@U1 ${plan.nozzle} nozzle`);
-      if (conv.u1Names.includes(n)) { s.preset = { kind: 'system', name: n }; return; }
+      const base = conv.u1BaseOf[s.preset.name];
+      const n = base && conv.u1Table[base][plan.nozzle];
+      if (n) { s.preset = { kind: 'system', name: n }; return; }
     }
     s.preset = conv3.pickFilament(s.from, plan.nozzle);
   });
