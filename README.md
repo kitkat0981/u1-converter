@@ -31,19 +31,37 @@ Drop a Bambu Studio or MakerWorld `.3mf` project.
 
 Open the downloaded `name-U1.3mf` in Snapmaker Orca.
 
-## Self-host (CasaOS / Docker)
+## Self-host (Docker on Ubuntu)
 
 Every push to `main` builds `ghcr.io/kitkat0981/u1-converter:latest` (amd64 + arm64).
+It is a small nginx container serving one page, so it needs no volumes, database or settings.
 
-**CasaOS:** *+ → Install a customized app → Import*, paste [`docker-compose.yml`](docker-compose.yml), then *Install*.
-The app runs on port `8765`.
+**1. Install Docker** (skip if it is already installed):
+```sh
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER   # log out and back in afterwards
+```
 
-**Plain Docker:**
+**2. Run it with Docker Compose:**
+```sh
+mkdir -p ~/u1-converter && cd ~/u1-converter
+curl -fsSLO https://raw.githubusercontent.com/kitkat0981/u1-converter/main/docker-compose.yml
+docker compose up -d
+```
+The app is then at `http://<server-ip>:8765`. To use another port, change `8765` in `docker-compose.yml`.
+
+Or without Compose:
 ```sh
 docker run -d --name u1-converter --restart unless-stopped -p 8765:80 ghcr.io/kitkat0981/u1-converter:latest
 ```
 
-**Update:** pull the new image (CasaOS: app settings → *Update*), or let Watchtower do it.
+**Update:**
+```sh
+cd ~/u1-converter && docker compose pull && docker compose up -d
+```
+Or let Watchtower update it automatically.
+
+**Remove:** `docker compose down` in the same folder.
 
 ### Install as an app (Windows, macOS, Android)
 Browsers only offer installing over **HTTPS**. Put it behind your reverse proxy (Pangolin, Caddy, Nginx Proxy Manager…), open the

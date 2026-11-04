@@ -6,15 +6,3 @@ services:
     restart: unless-stopped
     ports:
       - "8765:80"
-x-casaos:
-  architectures: [amd64, arm64]
-  main: u1-converter
-  title:
-    en_us: U1 Converter
-  tagline:
-    en_us: Bambu Studio → Snapmaker U1 presets and 3mf projects
-  category: Utilities
-  icon: https://raw.githubusercontent.com/kitkat0981/u1-converter/main/public/icon-512.png
-  port_map: "8765"
-  scheme: http
-  index: /
