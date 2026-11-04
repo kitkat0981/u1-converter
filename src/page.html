@@ -5,124 +5,169 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bambu → Snapmaker U1 Converter</title>/*HEAD*/
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
+  /* Slicer Studio design system: green = from Bambu, blue = to the U1, amber = adjusted, red = errors only */
   :root{
-    --bg:#f6f5f2; --panel:#ffffff; --ink:#1d1d1b; --muted:#6b6a65; --line:#e3e1db;
-    --accent:#0f6b5c; --accent-ink:#ffffff; --accent-soft:#e3f1ee;
-    --warn:#9a5b00; --warn-soft:#fdf2df; --drop:#8a2c2c; --drop-soft:#f8e9e7;
-    --mono:'IBM Plex Mono',ui-monospace,monospace; --sans:'IBM Plex Sans',system-ui,sans-serif;
-  }
-  @media (prefers-color-scheme: dark){
-    :root{ --bg:#151513; --panel:#1f1f1c; --ink:#ecebe6; --muted:#9c9a92; --line:#33322e;
-      --accent:#4fbfa8; --accent-ink:#0b1a17; --accent-soft:#16302b; --warn:#f0b35a; --warn-soft:#33270f; --drop:#f09a8f; --drop-soft:#3a1d1a; }
+    color-scheme:dark;
+    --bg:#17181B; --surface:#1E1F22; --panel:#222327; --raised:#2C2E33; --line:#3A3C42; --line-strong:#4A4D55;
+    --ink:#E8EAED; --soft:#C9CCD2; --muted:#A4A8B0;
+    --bambu:#00AE42; --bambu-text:#4CC97A; --bambu-soft:rgba(0,174,66,.16); --on-bambu:#0B1A10;
+    --u1:#4C9AFF; --u1-text:#7DB5FF; --u1-soft:rgba(76,154,255,.16); --on-u1:#0A1830;
+    --warn:#F5B94A; --warn-soft:rgba(245,165,36,.16); --drop:#FF6B6B; --drop-soft:rgba(255,107,107,.14);
+    --focus:#7DB5FF; --shadow-pop:0 12px 32px rgba(0,0,0,.45);
+    --mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace; --sans:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans)}
-  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 60px}
-  header h1{font-size:26px;font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
+  [hidden]{display:none !important}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--sans)}
+  a{color:var(--u1-text)}
+  :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+  .wrap{max-width:1120px;margin:0 auto;padding:24px 20px 60px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px}
+  .topbar .hq{width:40px;height:40px;font-size:16px}
+  header h1{font-size:30px;font-weight:700;margin:18px 0 6px;letter-spacing:-.015em;line-height:1.2}
   header p{margin:0;color:var(--muted);max-width:760px}
-  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:22px 0}
+  .dir{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .tag{padding:3px 9px;border-radius:4px;font-size:12px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+  .tag.from{background:var(--bambu-soft);color:var(--bambu-text)}
+  .tag.to{background:var(--u1-soft);color:var(--u1-text)}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:20px 0;padding:0;list-style:none}
   @media (max-width:760px){.steps{grid-template-columns:1fr}}
-  .step{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
-  .step b{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
-  .step p{margin:0;font-size:14px}
+  .step{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start}
+  .step .n{flex:0 0 28px;height:28px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;background:var(--raised);color:var(--ink);border:1px solid var(--line-strong)}
+  .step.s1{border-top:3px solid var(--bambu)} .step.s1 .n{background:var(--bambu);color:var(--on-bambu);border-color:var(--bambu)}
+  .step.s3{border-top:3px solid var(--u1)} .step.s3 .n{background:var(--u1);color:var(--on-u1);border-color:var(--u1)}
+  .step.s2{border-top:3px solid var(--line-strong)}
+  .step .t{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px;margin-bottom:4px}
+  .step p{margin:0;font-size:14px;color:var(--soft)}
+  .step p b{color:var(--ink);font-weight:600}
   code,.mono{font-family:var(--mono);font-size:12.5px}
-  .drop{border:2px dashed var(--line);border-radius:12px;background:var(--panel);padding:30px;text-align:center;transition:.15s;cursor:pointer}
-  .drop.over{border-color:var(--accent);background:var(--accent-soft)}
+  code{background:var(--raised);padding:1px 5px;border-radius:4px}
+  .drop{border:2px dashed var(--line-strong);border-radius:8px;background:var(--surface);padding:34px 20px;text-align:center;transition:.15s;cursor:pointer}
+  .drop:hover{border-color:var(--bambu)}
+  .drop.over{border-color:var(--bambu);background:var(--bambu-soft)}
+  .drop svg{display:block;margin:0 auto 8px}
   .drop strong{font-size:17px;display:block;margin-bottom:4px}
   .drop span{color:var(--muted);font-size:14px}
-  .opts{display:flex;flex-wrap:wrap;gap:18px;margin:18px 0 8px;align-items:flex-start}
-  .opt{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;flex:1 1 280px}
-  .opt h3{margin:0 0 6px;font-size:13px;font-weight:600}
-  .opt label{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;margin:3px 0;cursor:pointer}
-  .opt label small{display:block;color:var(--muted);font-size:12px}
-  .opt input{margin-top:3px;accent-color:var(--accent)}
+  .opts{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0 8px;align-items:stretch}
+  .opt{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 16px;flex:1 1 280px}
+  .opt h3{margin:0 0 8px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .opt label{display:flex;gap:8px;align-items:flex-start;font-size:14px;margin:6px 0;cursor:pointer}
+  .opt label small{display:block;color:var(--muted);font-size:12.5px}
+  .opt input{margin-top:4px;accent-color:var(--bambu)}
   .bar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:22px 0 10px}
-  .bar h2{margin:0;font-size:18px}
-  button{font:inherit;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 12px;cursor:pointer}
-  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600;padding:9px 16px}
-  button:disabled{opacity:.45;cursor:default}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin:10px 0;overflow:hidden}
+  .bar h2{margin:0;font-size:18px;font-weight:600}
+  button{font:500 14px var(--sans);border-radius:6px;border:1px solid transparent;background:var(--raised);color:var(--ink);padding:8px 14px;cursor:pointer;min-height:36px}
+  button:hover{background:#35373D}
+  button.primary{background:var(--u1);color:var(--on-u1);font-weight:600;padding:10px 18px;min-height:44px;font-size:15px}
+  button.primary:hover{background:#6AACFF}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.hq{width:28px;height:28px;min-height:0;padding:0;border-radius:999px;border:1px solid var(--line-strong);background:var(--raised);color:var(--ink);font-weight:700;font-size:13px;line-height:1;flex:0 0 auto}
+  button.hq:hover{border-color:var(--u1);color:var(--u1-text)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;margin:10px 0;overflow:hidden}
   .row{display:grid;grid-template-columns:28px minmax(180px,1.3fr) minmax(170px,1.1fr) 92px minmax(170px,1.1fr) auto;gap:10px;align-items:center;padding:12px 14px}
   @media (max-width:860px){.row{grid-template-columns:28px 1fr;}.row>*:nth-child(n+3){grid-column:2}}
+  .row input[type=checkbox]{accent-color:var(--bambu);width:18px;height:18px}
   .src{font-weight:500;word-break:break-word}
   .src small{display:block;color:var(--muted);font-weight:400;font-size:12px}
-  select,input[type=text]{font:inherit;font-size:13.5px;width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)}
-  .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:2px}
-  .chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-  .chip{font-size:12px;padding:2px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+  select,input[type=text]{font:inherit;font-size:13.5px;width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+  select:hover,input[type=text]:hover{border-color:var(--line-strong)}
+  .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;display:block;margin-bottom:3px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+  .chip{font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--bambu-soft);color:var(--bambu-text);white-space:nowrap}
   .chip.w{background:var(--warn-soft);color:var(--warn)}
   .chip.d{background:var(--drop-soft);color:var(--drop)}
-  .det{border-top:1px solid var(--line);padding:12px 14px 14px 52px;display:none}
+  .det{border-top:1px solid var(--line);padding:12px 14px 14px 52px;display:none;background:var(--surface)}
+  @media (max-width:860px){.det{padding-left:14px}}
   .card.open .det{display:block}
   .det ul.warn{margin:0 0 10px;padding:0;list-style:none}
-  .det ul.warn li{background:var(--warn-soft);color:var(--warn);border-radius:7px;padding:6px 10px;margin:4px 0;font-size:13.5px}
+  .det ul.warn li{background:var(--warn-soft);color:var(--warn);border-radius:6px;padding:7px 10px;margin:4px 0;font-size:13.5px}
   table{border-collapse:collapse;width:100%;font-size:13px}
-  th{text-align:left;font-weight:600;color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--line);padding:6px 8px}
-  td{border-bottom:1px solid var(--line);padding:6px 8px;vertical-align:top}
+  th{text-align:left;font-weight:600;color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--line);padding:7px 8px}
+  td{border-bottom:1px solid var(--raised);padding:7px 8px;vertical-align:top}
   td.k{font-family:var(--mono);font-size:12px;word-break:break-all}
   td.v{font-family:var(--mono);font-size:12px}
-  td.res{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--accent)}
-  .why{font-size:11px;color:var(--muted)}
+  td.res{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--u1-text)}
+  .why{font-size:11.5px;color:var(--muted);font-family:var(--sans);font-weight:400}
   details{margin-top:10px}
   summary{cursor:pointer;font-size:13.5px;color:var(--muted)}
+  summary:hover{color:var(--ink)}
   .empty{color:var(--muted);text-align:center;padding:20px}
   .skipped{font-size:13px;color:var(--muted);margin:6px 0}
-  .ref{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px 16px 14px;margin-top:28px}
-  .ref h2{font-size:17px}
+  .ref{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px 16px 14px;margin-top:28px}
+  .ref h2{font-size:17px;font-weight:600}
   .ref td,.ref th{font-size:13px}
-  td.res input,td.res textarea{font-family:var(--mono);font-size:12px;padding:4px 6px;width:100%;min-width:60px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--accent);font-weight:500}
+  .ref td{color:var(--soft)}
+  .ref-wrap{overflow-x:auto}
+  td.res input,td.res textarea{font-family:var(--mono);font-size:12px;padding:5px 7px;width:100%;min-width:60px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--u1-text);font-weight:600}
   td.res textarea{min-height:70px;resize:vertical}
   .slots{display:flex;gap:6px;align-items:center}
   .slots .sl{flex:1;min-width:0}
   .slots .sl span{display:block;font-size:10px;color:var(--muted)}
   tr.manual td.res input,tr.manual td.res textarea{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
-  button.rst{padding:1px 7px;font-size:12px;margin-top:4px}
+  button.rst{padding:1px 8px;font-size:12px;margin-top:4px;min-height:0}
   .add{display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap}
   .add input{max-width:340px;font-family:var(--mono);font-size:12.5px}
-  .tabs{display:flex;gap:4px;margin:20px 0 4px;border-bottom:1px solid var(--line)}
-  .tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;padding:9px 14px;font-weight:500;color:var(--muted)}
-  .tabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
+  .tabs{display:flex;gap:6px;margin:20px 0 4px;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;width:max-content;max-width:100%}
+  .tabs button{border:0;background:none;padding:8px 16px;font-weight:500;color:var(--muted);min-height:40px}
+  .tabs button:hover{background:var(--raised);color:var(--ink)}
+  .tabs button.on{color:var(--ink);background:var(--raised);box-shadow:inset 0 -2px 0 var(--bambu)}
   .slotgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
   @media (max-width:860px){.slotgrid{grid-template-columns:1fr 1fr}}
-  .slot{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .slot{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--u1);border-radius:6px;padding:12px}
   .slot h4{margin:0 0 8px;font-size:13px;display:flex;align-items:center;gap:8px}
-  .slot h4 b{background:var(--ink);color:var(--bg);border-radius:6px;padding:1px 7px;font-size:12px}
-  .slot input[type=color]{width:100%;height:30px;border:1px solid var(--line);border-radius:6px;background:none;padding:2px;cursor:pointer}
+  .slot h4 b{background:var(--u1);color:var(--on-u1);border-radius:4px;padding:1px 7px;font-size:12px}
+  .slot input[type=color]{width:100%;height:32px;border:1px solid var(--line);border-radius:6px;background:none;padding:2px;cursor:pointer}
   .slot .from{font-size:12px;color:var(--muted);margin-top:6px;min-height:16px}
-  .sw{display:inline-block;width:14px;height:14px;border-radius:4px;border:1px solid var(--line);vertical-align:-2px;margin-right:6px}
+  .sw{display:inline-block;width:14px;height:14px;border-radius:4px;border:1px solid var(--line-strong);vertical-align:-2px;margin-right:6px}
   .sum{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
-  .sum div{flex:0 1 auto;max-width:100%;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px;overflow-wrap:anywhere}
-  .sum span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
-  .sec{margin-top:20px}
-  .sec h3{font-size:15px;margin:0 0 8px}
+  .sum div{flex:0 1 auto;max-width:100%;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-size:13px;overflow-wrap:anywhere}
+  .sum span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+  .sec{margin-top:22px}
+  .sec h3{font-size:15px;font-weight:600;margin:0 0 8px;display:flex;align-items:center;gap:8px}
   ul.rep{margin:6px 0;padding-left:18px;font-size:13.5px}
   ul.rep.w li{color:var(--warn)}
   .rowbtns{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
-  .muted{color:var(--muted);font-size:13px}
-  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:8px;font-size:14px;opacity:0;transition:.2s;pointer-events:none}
+  .muted{color:var(--muted);font-size:13.5px}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--raised);border:1px solid var(--line-strong);color:var(--ink);padding:10px 16px;border-radius:8px;font-size:14px;box-shadow:var(--shadow-pop);opacity:0;transition:.2s;pointer-events:none;z-index:30}
   .toast.on{opacity:1}
-  footer{margin-top:26px;color:var(--muted);font-size:12px}
+  .pop{position:absolute;z-index:20;width:340px;max-width:calc(100vw - 24px);background:var(--raised);border:1px solid var(--line-strong);border-radius:8px;padding:16px 18px;box-shadow:var(--shadow-pop);display:flex;flex-direction:column;gap:8px}
+  .pop[hidden]{display:none}
+  .pop .eye{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--u1-text)}
+  .pop .pt{font-size:16px;font-weight:600}
+  .pop .pb{font-size:14px;line-height:1.5;color:var(--soft)}
+  .pop .pb p{margin:0 0 6px} .pop .pb ol{margin:0;padding-left:20px} .pop .pb li{margin:3px 0}
+  .pop .pf{display:flex;justify-content:flex-end;padding-top:4px}
+  .pop .pf button{background:var(--u1);color:var(--on-u1);font-weight:600;min-height:40px;padding:0 16px}
+  footer{margin-top:28px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--raised);padding-top:14px}
+  footer p{margin:4px 0}
   .loading{color:var(--muted);font-size:14px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
+    <div class="topbar">
+      <div class="brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00AE42" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h14M13 6l6 6-6 6"/></svg>U1 Converter</div>
+      <button class="hq" data-help="intro" aria-label="How this works" title="How this works">?</button>
+    </div>
     <h1>Bambu Studio → Snapmaker U1 converter</h1>
     <p>Turns Bambu Studio filament presets and .3mf projects into files Snapmaker Orca accepts for the U1. Your files are processed in this page only; nothing is uploaded.</p>
+    <div class="dir"><span class="tag from">FROM · Bambu Studio</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A4A8B0" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12h14M13 6l6 6-6 6"/></svg><span class="tag to">TO · Snapmaker U1 / Orca</span></div>
   </header>
 
   <nav class="tabs"><button data-tab="filaments" class="on">Filament presets</button><button data-tab="projects">3MF projects</button></nav>
   <div id="tab-filaments">
-  <div class="steps">
-    <div class="step"><b>1 · Export from Bambu Studio</b><p><b style="display:inline;color:inherit;text-transform:none;letter-spacing:0;font-size:inherit">File → Export → Export Preset Bundle</b>, then choose the filament presets. You can also drop the raw <code>.json</code> files from <code>BambuStudio/user/&lt;id&gt;/filament/</code>.</p></div>
-    <div class="step"><b>2 · Drop it here</b><p>Check the U1 base and nozzle picked for each filament, edit any result value or add your own overrides, then download the <code>.zip</code>.</p></div>
-    <div class="step"><b>3 · Import in Snapmaker Orca</b><p><b style="display:inline;color:inherit;text-transform:none;letter-spacing:0;font-size:inherit">File → Import → Import Configs</b> and pick the zip. Your filaments appear under <i>Custom</i> in the filament list when the U1 is selected.</p></div>
-  </div>
+  <ol class="steps">
+    <li class="step s1"><span class="n">1</span><div><div class="t">Export from Bambu Studio <button class="hq" data-help="export" aria-label="Help: exporting from Bambu Studio">?</button></div><p><b>File → Export → Export Preset Bundle</b>, then choose the filament presets. You can also drop the raw <code>.json</code> files from <code>BambuStudio/user/&lt;id&gt;/filament/</code>.</p></div></li>
+    <li class="step s2"><span class="n">2</span><div><div class="t">Drop it here and check <button class="hq" data-help="check" aria-label="Help: checking the converted settings">?</button></div><p>Check the U1 base and nozzle picked for each filament, edit any result value or add your own overrides, then download the <code>.zip</code>.</p></div></li>
+    <li class="step s3"><span class="n">3</span><div><div class="t">Import in Snapmaker Orca <button class="hq" data-help="import" aria-label="Help: importing into Snapmaker Orca">?</button></div><p><b>File → Import → Import Configs</b> and pick the zip. Your filaments appear under <i>Custom</i> in the filament list when the U1 is selected.</p></div></li>
+  </ol>
 
-  <div class="drop" id="drop" tabindex="0">
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose Bambu preset files">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#00AE42" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5"/><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>
     <strong>Drop a Bambu preset bundle or .json files</strong>
     <span>.bbsflmt · .bbscfg · .zip · .json — or click to choose</span>
     <input type="file" id="file" multiple accept=".json,.zip,.bbsflmt,.bbscfg,.orca_filament" hidden>
@@ -131,17 +176,17 @@
 
   <div class="opts">
     <div class="opt">
-      <h3>What to carry over</h3>
+      <h3>What to carry over <button class="hq" data-help="mode" aria-label="Help: what to carry over">?</button></h3>
       <label><input type="radio" name="mode" value="changes" checked><span>Only what I changed in Bambu <small>Recommended. Your edits go on top of the U1 base, which is already tuned for U1 hardware.</small></span></label>
       <label><input type="radio" name="mode" value="all"><span>Every printing value from the Bambu preset <small>Copies all the P1S temperatures, fans and speeds, even the ones you never touched.</small></span></label>
     </div>
     <div class="opt">
-      <h3>Hotend on your P1S</h3>
+      <h3>Hotend on your P1S <button class="hq" data-help="hotend" aria-label="Help: hotend">?</button></h3>
       <label><input type="radio" name="hotend" value="standard" checked><span>Standard hotend</span></label>
       <label><input type="radio" name="hotend" value="high_flow"><span>High Flow hotend <small>Used for U1 settings that have only one value.</small></span></label>
     </div>
     <div class="opt">
-      <h3>Preset type</h3>
+      <h3>Preset type <button class="hq" data-help="standalone" aria-label="Help: preset type">?</button></h3>
       <label><input type="radio" name="standalone" value="0" checked><span>Linked to the U1 system preset <small>Recommended. Your changes show in orange in Snapmaker Orca, and the rest follows Snapmaker's updates.</small></span></label>
       <label><input type="radio" name="standalone" value="1"><span>Standalone <small>Writes out every value. Use this if a linked import doesn't show up.</small></span></label>
     </div>
@@ -161,8 +206,10 @@
   </div><!-- /tab-filaments -->
 
   <div id="tab-projects" hidden>
-    <p class="muted" style="margin:14px 0">Convert a Bambu Studio or MakerWorld <code>.3mf</code> project for the U1. Painted colours are kept, the P1S printer and its G-code are replaced with the U1's, and values Snapmaker Orca rejects are corrected. Filaments you converted in the first tab appear in the slot lists below.</p>
-    <div class="drop" id="drop3" tabindex="0">
+    <p class="muted" style="margin:14px 0">
+      <button class="hq" data-help="project" aria-label="Help: converting a 3MF project" style="float:right;margin-left:10px">?</button>Convert a Bambu Studio or MakerWorld <code>.3mf</code> project for the U1. Painted colours are kept, the P1S printer and its G-code are replaced with the U1's, and values Snapmaker Orca rejects are corrected. Filaments you converted in the first tab appear in the slot lists below.</p>
+    <div class="drop" id="drop3" tabindex="0" role="button" aria-label="Choose a Bambu .3mf project">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#00AE42" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5"/><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg>
       <strong>Drop a Bambu .3mf project</strong>
       <span>or click to choose · processed in this page only</span>
       <input type="file" id="file3" accept=".3mf" hidden>
@@ -172,7 +219,7 @@
 
   <section class="ref" id="refsec">
     <h2>How Bambu and Snapmaker U1 filament presets differ</h2>
-    <table>
+    <div class="ref-wrap"><table>
       <tr><th style="width:24%">Area</th><th>Bambu Studio (P1S)</th><th>Snapmaker Orca (U1)</th><th style="width:22%">What the converter does</th></tr>
       <tr><td>Inheritance</td><td>User presets point to a Bambu parent (e.g. <code>Bambu PLA Basic @BBL P1S 0.4 nozzle</code>) and store only the differences</td><td>That parent doesn't exist, so the import silently skips the preset. That's the "0 configs imported" you get with Bambu files.</td><td>Finds your real changes by comparing with the Bambu parent, then links them to a U1 parent</td></tr>
       <tr><td>Hotend variants</td><td>2-slot arrays: <i>Direct Drive Standard</i> / <i>High Flow</i></td><td>1- or 2-slot arrays: <i>standard</i> / <i>high_flow</i></td><td>Maps slot to slot; Standard → standard, High Flow → high_flow</td></tr>
@@ -184,12 +231,18 @@
       <tr><td>Pressure advance</td><td>Not a filament setting (calibrated on the printer)</td><td>Per-filament <code>pressure_advance</code></td><td>Kept at U1 defaults; recalibrate on the U1</td></tr>
       <tr><td>Bambu-only features</td><td>Scarf seams per filament, overhang speeds, AMS drying, hole/circle compensation, chamber temperature</td><td>No filament-level equivalent (about 70 keys)</td><td>Dropped and listed under each preset</td></tr>
       <tr><td>Renamed keys</td><td><code>no_slow_down_for_cooling_on_outwalls</code></td><td><code>dont_slow_down_outer_wall</code></td><td>Renamed</td></tr>
-    </table>
+    </table></div>
   </section>
 
-  <footer id="foot"></footer>
+  <footer><p id="foot"></p><p>Unofficial community tool, not affiliated with or endorsed by Bambu Lab or Snapmaker.</p></footer>
 </div>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="pop" id="pop" role="dialog" aria-labelledby="pop-t" hidden>
+  <div class="eye" id="pop-e"></div>
+  <div class="pt" id="pop-t"></div>
+  <div class="pb" id="pop-b"></div>
+  <div class="pf"><button id="pop-ok">Got it</button></div>
+</div>
 
 <script>/*JSZIP*/</script>
 <script>/*CORE*/</script>
@@ -431,7 +484,7 @@ function renderProj(){
     <div><span>Old G-code</span>${info.gcodeFiles.length ? 'yes' : 'no'}</div>
   </div>
 
-  <div class="sec"><h3>U1 toolhead slots</h3>
+  <div class="sec"><h3>U1 toolhead slots <button class="hq" data-help="slots" aria-label="Help: U1 toolhead slots">?</button></h3>
     <div class="slotgrid">${plan.slots.map((s, i) => `
       <div class="slot"><h4><b>T${i + 1}</b> Slot ${i + 1}</h4>
         <input type="color" class="slotc" data-s="${i}" value="${esc(s.colour.slice(0, 7))}">
@@ -441,7 +494,7 @@ function renderProj(){
     </div>
   </div>
 
-  <div class="sec"><h3>Bambu filaments → U1 slot</h3>
+  <div class="sec"><h3>Bambu filaments → U1 slot <button class="hq" data-help="map" aria-label="Help: matching Bambu filaments to U1 slots">?</button></h3>
     <div class="card"><table>
       <tr><th>Bambu filament</th><th>Preset in the file</th><th>Used by</th><th style="width:140px">U1 slot</th></tr>
       ${info.filaments.map(f => `<tr><td><span class="sw" style="background:${esc(f.colour)}"></span>#${f.idx} · ${esc(f.type)}</td><td style="overflow-wrap:anywhere">${esc(f.settingsId)}</td>
@@ -463,7 +516,7 @@ function renderProj(){
     </div>
   </div>
 
-  <div class="sec"><h3>Process settings changed from the U1 default</h3>
+  <div class="sec"><h3>Process settings changed from the U1 default <button class="hq" data-help="process" aria-label="Help: process settings">?</button></h3>
     <div class="card"><table>
       <tr><th>Setting</th><th>Bambu value</th><th>U1 default</th><th style="width:34%">Result</th><th></th></tr>
       ${rows.length ? rows.map(r => `<tr class="${r.manual ? 'manual' : ''}" style="${r.removed || plan.keepProcess === false && !r.manual ? 'opacity:.45' : ''}">
@@ -565,6 +618,45 @@ function showTab(name){
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { try { location.hash = b.dataset.tab; } catch {} showTab(b.dataset.tab); });
 window.addEventListener('hashchange', () => showTab(location.hash.slice(1)));
 showTab(location.hash.slice(1));
+
+// ===================== quick help popups =====================
+const HELP = {
+  intro: { e: 'Quick help', t: 'How this works', b: `<ol><li><b>Export</b> your filament presets (or a .3mf project) from Bambu Studio.</li><li><b>Drop</b> the file here and check the settings. Green is what came from Bambu, blue is what the U1 gets, amber is something to look at.</li><li><b>Download</b> and import it in Snapmaker Orca.</li></ol><p style="margin-top:8px">Look for the <b>?</b> buttons for help on each part. Nothing leaves your computer.</p>` },
+  export: { e: 'Step 1', t: 'Getting your presets out of Bambu Studio', b: `<p>In Bambu Studio choose <b>File → Export → Export Preset Bundle</b>, pick <i>Filament presets</i>, and tick the ones you want.</p><p>Already have loose <code>.json</code> files? Drop those instead.</p>` },
+  check: { e: 'Step 2', t: 'Check the settings', b: `<p>Each filament gets a U1 base preset and nozzle. Change them if the guess is wrong.</p><p>Open <b>Details</b> to see every setting: Bambu value, U1 default and the result. Click a result to edit it. Amber means it was changed by hand or needs a second look.</p>` },
+  import: { e: 'Step 3', t: 'Import into Snapmaker Orca', b: `<p>In Snapmaker Orca choose <b>File → Import → Import Configs</b> and pick the downloaded <code>.zip</code>.</p><p>Select the U1 printer, then find your filaments under <i>Custom</i> in the filament list.</p>` },
+  mode: { e: 'Option', t: 'What to carry over', b: `<p><b>Only what I changed</b> is best for most people: the U1 base is already tuned for U1 hardware, and only your own tweaks are added on top.</p><p>Pick <b>Every printing value</b> only if you want the P1S numbers copied as they are.</p>` },
+  hotend: { e: 'Option', t: 'Which hotend?', b: `<p>Bambu presets can hold different values for the standard and High Flow hotends. Choose the one you print with on the P1S, so the right values are used where the U1 has only one.</p>` },
+  standalone: { e: 'Option', t: 'Linked or standalone', b: `<p><b>Linked</b> keeps your preset tied to the U1 system preset: your changes show in orange in Snapmaker Orca and the rest follows Snapmaker's updates.</p><p><b>Standalone</b> writes every value into the file. Use it if a linked preset doesn't show up after import.</p>` },
+  project: { e: '3MF projects', t: 'Converting a project', b: `<p>Drop a Bambu Studio or MakerWorld <code>.3mf</code>. Then choose which of the U1's 4 toolheads each colour uses, pick the nozzle and process, and press <b>Convert &amp; download</b>.</p><p>Open the result in Snapmaker Orca. Convert your filaments in the first tab first if you want them in the slot lists.</p>` },
+  slots: { e: '3MF projects', t: 'U1 toolhead slots', b: `<p>The U1 has 4 toolheads, T1 to T4. For each one, set the colour shown in Snapmaker Orca and the filament preset it will print with.</p>` },
+  map: { e: '3MF projects', t: 'Bambu filaments → U1 slots', b: `<p>Each colour in the Bambu project is sent to one U1 slot. Painted areas and parts follow it.</p><p>Projects with more than 4 colours are merged into the closest-coloured slot. Change any of them here.</p>` },
+  process: { e: '3MF projects', t: 'Process settings', b: `<p>These are print settings you changed in the Bambu project. They are applied on top of the U1 process you picked.</p><p>Edit a result, press <b>✕</b> to keep the U1 value instead, or add another setting below.</p>` },
+};
+const pop = $('#pop');
+let popFrom = null;
+function closeHelp(){ if (pop.hidden) return; pop.hidden = true; if (popFrom) { popFrom.setAttribute('aria-expanded', 'false'); popFrom.focus(); } popFrom = null; }
+function openHelp(btn){
+  const h = HELP[btn.dataset.help]; if (!h) return;
+  if (popFrom === btn && !pop.hidden) { closeHelp(); return; }
+  if (popFrom) popFrom.setAttribute('aria-expanded', 'false');
+  $('#pop-e').textContent = h.e; $('#pop-t').textContent = h.t; $('#pop-b').innerHTML = h.b;
+  pop.hidden = false; popFrom = btn; btn.setAttribute('aria-expanded', 'true');
+  const r = btn.getBoundingClientRect(), w = pop.offsetWidth, vw = document.documentElement.clientWidth;
+  pop.style.left = Math.max(12, Math.min(r.left + r.width / 2 - w / 2, vw - w - 12)) + window.scrollX + 'px';
+  pop.style.top = r.bottom + 8 + window.scrollY + 'px';
+  $('#pop-ok').focus();
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-help]');
+  if (b) { e.preventDefault(); e.stopPropagation(); openHelp(b); return; }
+  if (!pop.hidden && !pop.contains(e.target)) closeHelp();
+}, true);
+$('#pop-ok').onclick = closeHelp;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeHelp(); });
+window.addEventListener('resize', closeHelp);
+// first visit: show "How this works" once
+try { if (!localStorage.getItem('u1c-help-seen')) { localStorage.setItem('u1c-help-seen', '1'); setTimeout(() => openHelp(document.querySelector('[data-help="intro"]')), 400); } } catch {}
 /*PWA*/
 
 loadData().catch(err => { $('#status').textContent = 'Could not load preset libraries: ' + err.message; });

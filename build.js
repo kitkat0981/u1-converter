@@ -10,7 +10,7 @@ const core = read('src/core.js');
 const threemf = read('src/threemf.js');
 const data = fs.readFileSync(path.join(__dirname, 'data/presets.json.gz')).toString('base64');
 for (const [n, s] of [['jszip', jszip], ['core', core], ['threemf', threemf]]) if (/<\/script/i.test(s)) throw new Error(`${n} contains </script>`);
-const head = embedded ? '' : '\n<link rel="manifest" href="manifest.webmanifest">\n<link rel="icon" href="icon.svg" type="image/svg+xml">\n<link rel="apple-touch-icon" href="icon-192.png">\n<meta name="theme-color" content="#0f6b5c">';
+const head = embedded ? '' : '\n<link rel="manifest" href="manifest.webmanifest">\n<link rel="icon" href="icon.svg" type="image/svg+xml">\n<link rel="apple-touch-icon" href="icon-192.png">\n<meta name="theme-color" content="#17181B">';
 const pwa = embedded ? '' : [
   "try { if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js'); } catch {}",
   "try { if ('launchQueue' in window) launchQueue.setConsumer(async p => { for (const h of (p.files || [])) { const f = await h.getFile(); if (/\\.3mf$/i.test(f.name)) { showTab('projects'); openProject(f); } } }); } catch {}",
