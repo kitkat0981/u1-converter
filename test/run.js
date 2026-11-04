@@ -119,6 +119,16 @@ async function bambuProject() {
     assert.ok(!('filament_start_gcode' in pla.preset));
     assert.ok(pla.dropped.some(d => d.key === 'filament_scarf_seam_type'));
   });
+  await ok('product-parent presets keep the product traits (e.g. PETG HF temperature)', () => {
+    const j = { name: 'My PETG HF @BBL P1S', inherits: 'Bambu PETG HF @BBL P1S 0.4 nozzle', from: 'User', version: '2.2.0.4', filament_settings_id: ['My PETG HF @BBL P1S'], fan_max_speed: ['55'] };
+    const c2 = conv.collect([{ name: 'a.json', text: JSON.stringify(j) }]);
+    const r = conv.build(conv.analyse(c2.presets[0].json, c2.userLib), {});
+    const parent = resolve(conv.bbl, 'Bambu PETG HF @BBL P1S 0.4 nozzle');
+    assert.deepStrictEqual(r.preset.nozzle_temperature, [String(parent.nozzle_temperature[0])]);
+    const fan = r.rows.find(x => x.key === 'fan_max_speed'), temp = r.rows.find(x => x.key === 'nozzle_temperature');
+    assert.strictEqual(fan.why, 'your change'); assert.strictEqual(temp.why, 'product');
+    assert.ok(!r.dropped.some(d => d.key !== 'fan_max_speed' && /Bambu-only/.test(d.reason) && !(d.key in j)));
+  });
   await ok('maps standard / high-flow hotend slots', () => {
     const m = results.find(r => r.name === 'Matte tuned @U1');
     assert.deepStrictEqual(m.preset.filament_flow_ratio, ['0.97', '0.98']);
