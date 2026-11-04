@@ -1,8 +1,12 @@
 name: Update preset data
 
 # Every Monday: rebuild data/presets.json.gz from the latest Bambu Studio and Snapmaker Orca
-# releases. If anything changed and the tests pass, commit it and rebuild the Docker image.
-# If the tests fail, nothing is committed and GitHub emails the repository owner.
+# releases. If the data really changed and the tests pass, open a pull request with it.
+# Merging that pull request rebuilds the Docker image. If the tests fail, nothing is opened
+# and GitHub emails the repository owner.
+#
+# Requires: Settings → Actions → General → Workflow permissions →
+# "Allow GitHub Actions to create and approve pull requests".
 on:
   schedule:
     - cron: '17 7 * * 1'
@@ -10,7 +14,7 @@ on:
 
 permissions:
   contents: write
-  actions: write
+  pull-requests: write
 
 jobs:
   update:
@@ -26,22 +30,26 @@ jobs:
       - run: npm ci
       - run: python3 tools/update-presets.py
       - run: npm test
-      - name: Commit if the data changed
-        id: commit
-        run: |
-          if git diff --quiet -- data/presets.json.gz; then
-            echo "No upstream changes."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          meta=$(python3 -c "import gzip,json;m=json.loads(gzip.open('data/presets.json.gz').read())['meta'];print(m['bambu']+', '+m['snapmaker'])")
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Update preset data ($meta)" -- data/presets.json.gz
-          git push
-          echo "changed=true" >> "$GITHUB_OUTPUT"
-      - name: Rebuild the image
-        if: steps.commit.outputs.changed == 'true'
-        run: gh workflow run docker.yml --ref main
+      - name: Open a pull request if the data changed
         env:
           GH_TOKEN: ${{ github.token }}
+        run: |
+          # Compare the decompressed data: gzip bytes differ between zlib versions even when the data is identical.
+          git show HEAD:data/presets.json.gz | gunzip > /tmp/old.json
+          gunzip -c data/presets.json.gz > /tmp/new.json
+          if cmp -s /tmp/old.json /tmp/new.json; then
+            echo "No upstream changes."
+            git checkout -- data/presets.json.gz
+            exit 0
+          fi
+          meta=$(python3 -c "import json;m=json.load(open('/tmp/new.json'))['meta'];print(m['bambu']+', '+m['snapmaker'])")
+          branch="preset-data/$(date -u +%Y-%m-%d)"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then echo "Branch $branch already exists."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git commit -m "Update preset data ($meta)" -- data/presets.json.gz
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "Update preset data ($meta)" \
+            --body "Weekly refresh from the latest Bambu Studio and Snapmaker Orca releases. Tests passed. Merging rebuilds the Docker image."
