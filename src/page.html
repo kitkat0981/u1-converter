@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bambu → Snapmaker U1 Converter</title>/*HEAD*/
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f6f5f2; --panel:#ffffff; --ink:#1d1d1b; --muted:#6b6a65; --line:#e3e1db;
+    --accent:#0f6b5c; --accent-ink:#ffffff; --accent-soft:#e3f1ee;
+    --warn:#9a5b00; --warn-soft:#fdf2df; --drop:#8a2c2c; --drop-soft:#f8e9e7;
+    --mono:'IBM Plex Mono',ui-monospace,monospace; --sans:'IBM Plex Sans',system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#151513; --panel:#1f1f1c; --ink:#ecebe6; --muted:#9c9a92; --line:#33322e;
+      --accent:#4fbfa8; --accent-ink:#0b1a17; --accent-soft:#16302b; --warn:#f0b35a; --warn-soft:#33270f; --drop:#f09a8f; --drop-soft:#3a1d1a; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans)}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 60px}
+  header h1{font-size:26px;font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
+  header p{margin:0;color:var(--muted);max-width:760px}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:22px 0}
+  @media (max-width:760px){.steps{grid-template-columns:1fr}}
+  .step{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .step b{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
+  .step p{margin:0;font-size:14px}
+  code,.mono{font-family:var(--mono);font-size:12.5px}
+  .drop{border:2px dashed var(--line);border-radius:12px;background:var(--panel);padding:30px;text-align:center;transition:.15s;cursor:pointer}
+  .drop.over{border-color:var(--accent);background:var(--accent-soft)}
+  .drop strong{font-size:17px;display:block;margin-bottom:4px}
+  .drop span{color:var(--muted);font-size:14px}
+  .opts{display:flex;flex-wrap:wrap;gap:18px;margin:18px 0 8px;align-items:flex-start}
+  .opt{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;flex:1 1 280px}
+  .opt h3{margin:0 0 6px;font-size:13px;font-weight:600}
+  .opt label{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;margin:3px 0;cursor:pointer}
+  .opt label small{display:block;color:var(--muted);font-size:12px}
+  .opt input{margin-top:3px;accent-color:var(--accent)}
+  .bar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:22px 0 10px}
+  .bar h2{margin:0;font-size:18px}
+  button{font:inherit;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 12px;cursor:pointer}
+  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600;padding:9px 16px}
+  button:disabled{opacity:.45;cursor:default}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin:10px 0;overflow:hidden}
+  .row{display:grid;grid-template-columns:28px minmax(180px,1.3fr) minmax(170px,1.1fr) 92px minmax(170px,1.1fr) auto;gap:10px;align-items:center;padding:12px 14px}
+  @media (max-width:860px){.row{grid-template-columns:28px 1fr;}.row>*:nth-child(n+3){grid-column:2}}
+  .src{font-weight:500;word-break:break-word}
+  .src small{display:block;color:var(--muted);font-weight:400;font-size:12px}
+  select,input[type=text]{font:inherit;font-size:13.5px;width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)}
+  .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:2px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .chip{font-size:12px;padding:2px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+  .chip.w{background:var(--warn-soft);color:var(--warn)}
+  .chip.d{background:var(--drop-soft);color:var(--drop)}
+  .det{border-top:1px solid var(--line);padding:12px 14px 14px 52px;display:none}
+  .card.open .det{display:block}
+  .det ul.warn{margin:0 0 10px;padding:0;list-style:none}
+  .det ul.warn li{background:var(--warn-soft);color:var(--warn);border-radius:7px;padding:6px 10px;margin:4px 0;font-size:13.5px}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th{text-align:left;font-weight:600;color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--line);padding:6px 8px}
+  td{border-bottom:1px solid var(--line);padding:6px 8px;vertical-align:top}
+  td.k{font-family:var(--mono);font-size:12px;word-break:break-all}
+  td.v{font-family:var(--mono);font-size:12px}
+  td.res{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--accent)}
+  .why{font-size:11px;color:var(--muted)}
+  details{margin-top:10px}
+  summary{cursor:pointer;font-size:13.5px;color:var(--muted)}
+  .empty{color:var(--muted);text-align:center;padding:20px}
+  .skipped{font-size:13px;color:var(--muted);margin:6px 0}
+  .ref{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px 16px 14px;margin-top:28px}
+  .ref h2{font-size:17px}
+  .ref td,.ref th{font-size:13px}
+  td.res input,td.res textarea{font-family:var(--mono);font-size:12px;padding:4px 6px;width:100%;min-width:60px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--accent);font-weight:500}
+  td.res textarea{min-height:70px;resize:vertical}
+  .slots{display:flex;gap:6px;align-items:center}
+  .slots .sl{flex:1;min-width:0}
+  .slots .sl span{display:block;font-size:10px;color:var(--muted)}
+  tr.manual td.res input,tr.manual td.res textarea{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+  button.rst{padding:1px 7px;font-size:12px;margin-top:4px}
+  .add{display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap}
+  .add input{max-width:340px;font-family:var(--mono);font-size:12.5px}
+  .tabs{display:flex;gap:4px;margin:20px 0 4px;border-bottom:1px solid var(--line)}
+  .tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;padding:9px 14px;font-weight:500;color:var(--muted)}
+  .tabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
+  .slotgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  @media (max-width:860px){.slotgrid{grid-template-columns:1fr 1fr}}
+  .slot{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .slot h4{margin:0 0 8px;font-size:13px;display:flex;align-items:center;gap:8px}
+  .slot h4 b{background:var(--ink);color:var(--bg);border-radius:6px;padding:1px 7px;font-size:12px}
+  .slot input[type=color]{width:100%;height:30px;border:1px solid var(--line);border-radius:6px;background:none;padding:2px;cursor:pointer}
+  .slot .from{font-size:12px;color:var(--muted);margin-top:6px;min-height:16px}
+  .sw{display:inline-block;width:14px;height:14px;border-radius:4px;border:1px solid var(--line);vertical-align:-2px;margin-right:6px}
+  .sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:12px 0}
+  .sum div{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px}
+  .sum span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .sec{margin-top:20px}
+  .sec h3{font-size:15px;margin:0 0 8px}
+  ul.rep{margin:6px 0;padding-left:18px;font-size:13.5px}
+  ul.rep.w li{color:var(--warn)}
+  .rowbtns{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
+  .muted{color:var(--muted);font-size:13px}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:8px;font-size:14px;opacity:0;transition:.2s;pointer-events:none}
+  .toast.on{opacity:1}
+  footer{margin-top:26px;color:var(--muted);font-size:12px}
+  .loading{color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Bambu Studio → Snapmaker U1 converter</h1>
+    <p>Turns Bambu Studio filament presets and .3mf projects into files Snapmaker Orca accepts for the U1. Your files are processed in this page only; nothing is uploaded.</p>
+  </header>
+
+  <nav class="tabs"><button data-tab="filaments" class="on">Filament presets</button><button data-tab="projects">3MF projects</button></nav>
+  <div id="tab-filaments">
+  <div class="steps">
+    <div class="step"><b>1 · Export from Bambu Studio</b><p><b style="display:inline;color:inherit;text-transform:none;letter-spacing:0;font-size:inherit">File → Export → Export Preset Bundle</b>, then choose the filament presets. You can also drop the raw <code>.json</code> files from <code>BambuStudio/user/&lt;id&gt;/filament/</code>.</p></div>
+    <div class="step"><b>2 · Drop it here</b><p>Check the U1 base and nozzle picked for each filament, edit any result value or add your own overrides, then download the <code>.zip</code>.</p></div>
+    <div class="step"><b>3 · Import in Snapmaker Orca</b><p><b style="display:inline;color:inherit;text-transform:none;letter-spacing:0;font-size:inherit">File → Import → Import Configs</b> and pick the zip. Your filaments appear under <i>Custom</i> in the filament list when the U1 is selected.</p></div>
+  </div>
+
+  <div class="drop" id="drop" tabindex="0">
+    <strong>Drop a Bambu preset bundle or .json files</strong>
+    <span>.bbsflmt · .bbscfg · .zip · .json — or click to choose</span>
+    <input type="file" id="file" multiple accept=".json,.zip,.bbsflmt,.bbscfg,.orca_filament" hidden>
+  </div>
+  <div id="status" class="loading" style="margin-top:8px">Loading preset libraries…</div>
+
+  <div class="opts">
+    <div class="opt">
+      <h3>What to carry over</h3>
+      <label><input type="radio" name="mode" value="changes" checked><span>Only what I changed in Bambu <small>Recommended. Your edits go on top of the U1 base, which is already tuned for U1 hardware.</small></span></label>
+      <label><input type="radio" name="mode" value="all"><span>Every printing value from the Bambu preset <small>Copies all the P1S temperatures, fans and speeds, even the ones you never touched.</small></span></label>
+    </div>
+    <div class="opt">
+      <h3>Hotend on your P1S</h3>
+      <label><input type="radio" name="hotend" value="standard" checked><span>Standard hotend</span></label>
+      <label><input type="radio" name="hotend" value="high_flow"><span>High Flow hotend <small>Used for U1 settings that have only one value.</small></span></label>
+    </div>
+    <div class="opt">
+      <h3>Preset type</h3>
+      <label><input type="radio" name="standalone" value="0" checked><span>Linked to the U1 system preset <small>Recommended. Your changes show in orange in Snapmaker Orca, and the rest follows Snapmaker's updates.</small></span></label>
+      <label><input type="radio" name="standalone" value="1"><span>Standalone <small>Writes out every value. Use this if a linked import doesn't show up.</small></span></label>
+    </div>
+  </div>
+
+  <div class="bar" id="bar" hidden>
+    <h2 id="count"></h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button id="toggleAll">Expand all</button>
+      <button id="clear">Clear</button>
+      <button class="primary" id="dl">Download .zip for Snapmaker Orca</button>
+    </div>
+  </div>
+  <div id="skipped"></div>
+  <div id="list"></div>
+
+  </div><!-- /tab-filaments -->
+
+  <div id="tab-projects" hidden>
+    <p class="muted" style="margin:14px 0">Convert a Bambu Studio or MakerWorld <code>.3mf</code> project for the U1. Painted colours are kept, the P1S printer and its G-code are replaced with the U1's, and values Snapmaker Orca rejects are corrected. Filaments you converted in the first tab appear in the slot lists below.</p>
+    <div class="drop" id="drop3" tabindex="0">
+      <strong>Drop a Bambu .3mf project</strong>
+      <span>or click to choose · processed in this page only</span>
+      <input type="file" id="file3" accept=".3mf" hidden>
+    </div>
+    <div id="proj"></div>
+  </div>
+
+  <section class="ref" id="refsec">
+    <h2>How Bambu and Snapmaker U1 filament presets differ</h2>
+    <table>
+      <tr><th style="width:24%">Area</th><th>Bambu Studio (P1S)</th><th>Snapmaker Orca (U1)</th><th style="width:22%">What the converter does</th></tr>
+      <tr><td>Inheritance</td><td>User presets point to a Bambu parent (e.g. <code>Bambu PLA Basic @BBL P1S 0.4 nozzle</code>) and store only the differences</td><td>That parent doesn't exist, so the import silently skips the preset. That's the "0 configs imported" you get with Bambu files.</td><td>Finds your real changes by comparing with the Bambu parent, then links them to a U1 parent</td></tr>
+      <tr><td>Hotend variants</td><td>2-slot arrays: <i>Direct Drive Standard</i> / <i>High Flow</i></td><td>1- or 2-slot arrays: <i>standard</i> / <i>high_flow</i></td><td>Maps slot to slot; Standard → standard, High Flow → high_flow</td></tr>
+      <tr><td>Importer checks</td><td>—</td><td>Needs a valid <code>version</code>, a <code>filament_settings_id</code>, and a parent that exists</td><td>Writes all three</td></tr>
+      <tr><td>Material properties</td><td>Density, cost, vendor, temperature range, softening temp</td><td>Same keys</td><td>Always copied: they belong to the spool, not the printer</td></tr>
+      <tr><td>Temps, fans, cooling, flow</td><td>Tuned for the P1S hotend</td><td>Same keys, tuned for the U1. U1 defaults run lower max volumetric speeds (e.g. Generic PLA 12 vs 21 mm³/s) and hotter beds (PLA 65 °C vs 55 °C)</td><td>Copies your changes and flags flow-ratio and speed values to re-test</td></tr>
+      <tr><td>Filament G-code</td><td>Bambu commands (<code>M142</code>, <code>M106 P3</code> chamber/aux fans)</td><td>Klipper firmware, U1 toolchanger macros</td><td>Not copied; you get a warning if you had customized it</td></tr>
+      <tr><td>Toolchange / ramming / purge</td><td>AMS cutter retraction (<code>…_when_cut</code>), flush settings</td><td>Toolchanger retraction, multitool ramming, wipe-tower purge</td><td>Kept at U1 values</td></tr>
+      <tr><td>Pressure advance</td><td>Not a filament setting (calibrated on the printer)</td><td>Per-filament <code>pressure_advance</code></td><td>Kept at U1 defaults; recalibrate on the U1</td></tr>
+      <tr><td>Bambu-only features</td><td>Scarf seams per filament, overhang speeds, AMS drying, hole/circle compensation, chamber temperature</td><td>No filament-level equivalent (about 70 keys)</td><td>Dropped and listed under each preset</td></tr>
+      <tr><td>Renamed keys</td><td><code>no_slow_down_for_cooling_on_outwalls</code></td><td><code>dont_slow_down_outer_wall</code></td><td>Renamed</td></tr>
+    </table>
+  </section>
+
+  <footer id="foot"></footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>/*JSZIP*/</script>
+<script>/*CORE*/</script>
+<script>/*THREEMF*/</script>
+<script>
+const DATA_B64 = "/*DATA*/";
+let conv = null, plans = [], skipped = [], allOpen = false;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = v => v === undefined ? '—' : Array.isArray(v) ? v.map(x => String(x).length > 40 ? String(x).slice(0, 40) + '…' : x).join(' / ') : String(v);
+function editor(key, val, variants, cls){
+  cls = cls || 'ov';
+  const vals = Array.isArray(val) ? val : [val];
+  const one = (v, i) => { const t = String(v ?? ''); return (t.length > 50 || t.includes('\n'))
+      ? `<textarea class="${cls}" data-k="${esc(key)}" data-s="${i}">${esc(t)}</textarea>`
+      : `<input type="text" class="${cls}" data-k="${esc(key)}" data-s="${i}" value="${esc(t)}">`; };
+  if (vals.length === 1) return one(vals[0], 0);
+  return `<div class="slots">${vals.map((v, i) => `<div class="sl"><span>${variants[i] === 'high_flow' ? 'high-flow' : (variants[i] || 'slot ' + (i + 1))}</span>${one(v, i)}</div>`).join('')}</div>`;
+}
+function toast(m){ const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), 2600); }
+
+async function loadData(){
+  const bin = Uint8Array.from(atob(DATA_B64), c => c.charCodeAt(0));
+  const stream = new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'));
+  const data = JSON.parse(await new Response(stream).text());
+  conv = new B2U.Converter(data);
+  conv3 = new B2U3.Converter3MF(data, conv);
+  printKeyList = data.printKeys.slice().sort();
+  $('#status').textContent = '';
+  $('#foot').innerHTML = `Preset libraries: ${esc(data.meta.bambu)} · ${esc(data.meta.snapmaker)}. ${conv.u1Names.length} U1 filament presets available as bases.`;
+}
+
+function opts(){
+  return { mode: document.querySelector('input[name=mode]:checked').value,
+           hotend: document.querySelector('input[name=hotend]:checked').value,
+           standalone: document.querySelector('input[name=standalone]:checked').value === '1' };
+}
+
+async function readFiles(files){
+  if (!conv) { toast('Still loading, try again in a second'); return; }
+  const entries = [];
+  for (const f of files) {
+    const buf = await f.arrayBuffer();
+    const head = new Uint8Array(buf.slice(0, 2));
+    if (head[0] === 0x50 && head[1] === 0x4b) {
+      try {
+        const z = await JSZip.loadAsync(buf);
+        for (const e of Object.values(z.files)) if (!e.dir && /\.json$/i.test(e.name)) entries.push({ name: `${f.name} › ${e.name}`, text: await e.async('string') });
+      } catch (err) { skipped.push({ file: f.name, reason: 'Could not open archive' }); }
+    } else if (/\.json$/i.test(f.name)) {
+      entries.push({ name: f.name, text: new TextDecoder().decode(buf) });
+    } else skipped.push({ file: f.name, reason: 'Not a .json or preset bundle' });
+  }
+  const col = conv.collect(entries);
+  skipped.push(...col.skipped);
+  const known = new Set(plans.map(p => p.srcName));
+  for (const p of col.presets) {
+    const plan = conv.analyse(p.json, col.userLib);
+    if (known.has(plan.srcName)) continue;
+    plan.include = true; plan.file = p.file;
+    plans.push(plan);
+  }
+  render();
+  if (!col.presets.length) toast('No filament presets found in those files');
+}
+
+function build(){
+  const o = opts();
+  const res = plans.map(p => ({ plan: p, r: conv.build(p, o) }));
+  conv.uniqueNames(res.filter(x => x.plan.include).map(x => x.r));
+  return res;
+}
+
+function render(){
+  const res = build();
+  $('#bar').hidden = plans.length === 0;
+  const n = plans.filter(p => p.include).length;
+  $('#count').textContent = `${plans.length} filament preset${plans.length === 1 ? '' : 's'} · ${n} selected`;
+  $('#dl').disabled = n === 0;
+  $('#skipped').innerHTML = skipped.length ? `<details class="skipped"><summary>${skipped.length} file${skipped.length > 1 ? 's' : ''} skipped</summary>${skipped.map(s => `<div>${esc(s.file)}: ${esc(s.reason)}</div>`).join('')}</details>` : '';
+  const bases = conv ? conv.u1Bases() : [];
+  $('#list').innerHTML = plans.length ? res.map(({ plan, r }, i) => {
+    const nozzles = conv.u1NozzlesFor(plan.base);
+    const nz = nozzles.includes(plan.nozzle) ? nozzles : [plan.nozzle, ...nozzles];
+    return `<div class="card${plan.open ? ' open' : ''}" data-i="${i}">
+      <div class="row">
+        <input type="checkbox" class="inc" ${plan.include ? 'checked' : ''} title="Include in download">
+        <div class="src">${esc(plan.srcName)}<small>${plan.parent.name ? 'Parent: ' + esc(plan.parent.name) : plan.parent.baseline ? 'Compared with: ' + esc(plan.parent.baseline) : 'No parent'}</small></div>
+        <div><span class="lbl">U1 base</span><select class="base">${bases.map(b => `<option${b === plan.base ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select></div>
+        <div><span class="lbl">Nozzle</span><select class="nz">${nz.map(x => `<option value="${x}"${x === plan.nozzle ? ' selected' : ''}>${x} mm</option>`).join('')}</select></div>
+        <div><span class="lbl">New name</span><input type="text" class="nm" value="${esc(plan.outName)}"></div>
+        <div class="chips">
+          <span class="chip">${r.rows.filter(x => !x.manual || x.auto !== undefined).length} carried</span>
+          ${r.rows.some(x => x.manual) ? `<span class="chip w">${r.rows.filter(x => x.manual).length} edited</span>` : ''}
+          ${r.warnings.length ? `<span class="chip w">${r.warnings.length} note${r.warnings.length > 1 ? 's' : ''}</span>` : ''}
+          ${r.dropped.length ? `<span class="chip d">${r.dropped.length} dropped</span>` : ''}
+          <button class="more" style="padding:2px 9px;font-size:12px">${plan.open ? 'Hide' : 'Details'}</button>
+        </div>
+      </div>
+      <div class="det">
+        <div class="why" style="margin-bottom:8px">Output: <span class="mono">${esc(r.name)}</span> → parent <span class="mono">${esc(r.target)}</span>${r.variants.length > 1 ? ' · values shown as standard / high-flow hotend' : ''}</div>
+        ${r.warnings.length ? `<ul class="warn">${r.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
+        ${r.rows.length ? `<table><tr><th>Setting</th><th>Bambu value</th><th>U1 default</th><th style="width:34%">Result <span style="text-transform:none;letter-spacing:0;font-weight:400">(click to edit)</span></th></tr>${r.rows.map(x => `<tr class="${x.manual ? 'manual' : ''}"><td class="k">${esc(x.key)}${x.from !== x.key ? `<div class="why">from ${esc(x.from)}</div>` : ''}</td><td class="v">${esc(fmt(x.bambu))}</td><td class="v">${esc(fmt(x.u1))}</td><td class="res">${editor(x.key, x.result, r.variants)}<div class="why">${x.manual ? `manual override${x.auto !== undefined ? ' · converter had ' + esc(fmt(x.auto)) : ''}` : esc(x.why)}</div>${x.manual ? `<button class="rst" data-k="${esc(x.key)}">Reset</button>` : ''}</td></tr>`).join('')}</table>` : '<div class="why">No differences from the U1 base — the preset will match it, with your name and notes.</div>'}
+        <div class="add"><span class="why" style="font-size:12.5px">Override another setting:</span><input type="text" class="addk" list="keys-${i}" placeholder="e.g. pressure_advance"><datalist id="keys-${i}">${r.filamentKeys.map(k => `<option value="${k}">`).join('')}</datalist><button class="addb">Add</button></div>
+        ${r.dropped.length ? `<details><summary>${r.dropped.length} setting${r.dropped.length > 1 ? 's' : ''} not carried over</summary><table><tr><th>Setting</th><th>Your value</th><th>Why</th></tr>${r.dropped.map(d => `<tr><td class="k">${esc(d.key)}</td><td class="v">${esc(fmt(d.value))}</td><td>${esc(d.reason)}</td></tr>`).join('')}</table></details>` : ''}
+        <div style="margin-top:10px;display:flex;gap:8px"><button class="one">Download this .json</button><button class="copy">Copy JSON</button></div>
+      </div>
+    </div>`;
+  }).join('') : '';
+  window.__res = res;
+}
+
+$('#list').addEventListener('change', e => {
+  const card = e.target.closest('.card'); if (!card) return;
+  const p = plans[+card.dataset.i];
+  if (e.target.classList.contains('inc')) p.include = e.target.checked;
+  if (e.target.classList.contains('base')) { p.base = e.target.value; const nz = conv.u1NozzlesFor(p.base); if (!nz.includes(p.nozzle)) p.nozzle = nz.includes('0.4') ? '0.4' : nz[0]; }
+  if (e.target.classList.contains('nz')) p.nozzle = e.target.value;
+  if (e.target.classList.contains('nm')) p.outName = e.target.value.trim() || p.outName;
+  if (e.target.classList.contains('ov')) {
+    const k = e.target.dataset.k;
+    const vals = [...card.querySelectorAll('.ov')].filter(el => el.dataset.k === k).sort((a, b) => a.dataset.s - b.dataset.s).map(el => el.value);
+    p.overrides = p.overrides || {};
+    p.overrides[k] = vals;
+  }
+  if (e.target.classList.contains('addk')) return;
+  render();
+});
+$('#list').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('addk')) { e.preventDefault(); e.target.closest('.card').querySelector('.addb').click(); } });
+$('#list').addEventListener('click', async e => {
+  const card = e.target.closest('.card'); if (!card) return;
+  const i = +card.dataset.i, p = plans[i];
+  if (e.target.classList.contains('more')) { p.open = !p.open; render(); }
+  if (e.target.classList.contains('rst')) { delete (p.overrides || {})[e.target.dataset.k]; render(); }
+  if (e.target.classList.contains('addb')) {
+    const r = window.__res[i].r, k = card.querySelector('.addk').value.trim();
+    if (!r.filamentKeys.includes(k)) { toast(k ? `"${k}" is not a Snapmaker Orca filament setting` : 'Type a setting name'); return; }
+    const cur = r.preset[k] !== undefined ? r.preset[k] : r.tgtRes[k];
+    p.overrides = p.overrides || {};
+    p.overrides[k] = Array.isArray(cur) ? cur.slice() : [cur ?? ''];
+    render();
+    const el = document.querySelector(`.card[data-i="${i}"] .ov[data-k="${k}"]`); if (el) { el.focus(); el.select && el.select(); }
+  }
+  if (e.target.classList.contains('one')) { const r = window.__res[i].r; await save(r.name + '.json', JSON.stringify(r.preset, null, 4)); }
+  if (e.target.classList.contains('copy')) {
+    try { await navigator.clipboard.writeText(JSON.stringify(window.__res[i].r.preset, null, 4)); toast('Copied'); } catch { toast('Copy was blocked by the browser'); }
+  }
+});
+document.querySelectorAll('.opts input').forEach(el => el.addEventListener('change', render));
+$('#toggleAll').onclick = () => { allOpen = !allOpen; plans.forEach(p => p.open = allOpen); $('#toggleAll').textContent = allOpen ? 'Collapse all' : 'Expand all'; render(); };
+$('#clear').onclick = () => { plans = []; skipped = []; render(); };
+
+const drop = $('#drop'), fi = $('#file');
+drop.onclick = () => fi.click();
+drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') fi.click(); };
+fi.onchange = () => { readFiles([...fi.files]); fi.value = ''; };
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => readFiles([...e.dataTransfer.files]));
+
+let downloads = null;
+(async () => { try { if (window.claude && claude.use) downloads = await claude.use('downloads'); } catch {} })();
+async function save(filename, data){
+  if (downloads) {
+    try { await downloads.save({ filename, data }); toast('Saved ' + filename); }
+    catch (err) { if (err && err.code === 'declined') return; toast('Download unavailable here' + (err && err.code ? ` (${err.code})` : '')); }
+    return;
+  }
+  const blob = data instanceof Blob ? data : new Blob([data], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+$('#dl').onclick = async () => {
+  const z = new JSZip();
+  for (const { plan, r } of window.__res) if (plan.include) z.file(r.name.replace(/[\\/:*?"<>|]/g, '_') + '.json', JSON.stringify(r.preset, null, 4));
+  await save('snapmaker-u1-filaments.zip', await z.generateAsync({ type: 'blob' }));
+};
+
+
+// ===================== 3MF projects =====================
+let conv3 = null, proj = null, printKeyList = [];
+function customFilaments(nozzle){
+  const out = {};
+  for (const x of (window.__res || [])) if (x.plan.include && x.r.nozzle === nozzle) out[x.r.name] = x.r.preset;
+  return out;
+}
+function filamentOptions(nozzle, sel){
+  const customs = Object.keys(customFilaments(nozzle));
+  const sys = conv.u1Names.filter(n => n.endsWith(`@U1 ${nozzle} nozzle`));
+  const opt = (kind, n, label) => `<option value="${kind}|${esc(n)}"${sel.kind === kind && sel.name === n ? ' selected' : ''}>${esc(label)}</option>`;
+  return (customs.length ? `<optgroup label="Your converted filaments">${customs.map(n => opt('custom', n, n)).join('')}</optgroup>` : '')
+    + `<optgroup label="Snapmaker U1 presets">${sys.map(n => opt('system', n, n.replace(/ @U1 .*$/, ''))).join('')}</optgroup>`;
+}
+async function openProject(file){
+  if (!conv3) { toast('Still loading, try again in a second'); return; }
+  $('#proj').innerHTML = '<p class="muted">Reading project…</p>';
+  try {
+    const zip = await JSZip.loadAsync(await file.arrayBuffer());
+    const info = await conv3.inspect(zip);
+    proj = { file, zip, info, plan: conv3.defaultPlan(info), report: null };
+    renderProj();
+  } catch (e) { proj = null; $('#proj').innerHTML = `<p class="skipped" style="color:var(--drop)">Could not read ${esc(file.name)}: ${esc(e.message)}</p>`; }
+}
+function fixSlotPresets(){
+  const { plan, info } = proj, cust = customFilaments(plan.nozzle);
+  plan.slots.forEach(s => {
+    if (s.preset.kind === 'custom' && cust[s.preset.name]) return;
+    if (s.preset.kind === 'system') {
+      const n = s.preset.name.replace(/@U1 \d\.\d nozzle$/, `@U1 ${plan.nozzle} nozzle`);
+      if (conv.u1Names.includes(n)) { s.preset = { kind: 'system', name: n }; return; }
+    }
+    s.preset = conv3.pickFilament(s.from, plan.nozzle);
+  });
+}
+function renderProj(){
+  const el = $('#proj');
+  if (!proj) { el.innerHTML = ''; return; }
+  const { info, plan } = proj;
+  fixSlotPresets();
+  const pc = conv3.processCarry(info, plan.process);
+  const ov = plan.procOverrides;
+  const rows = pc.carry.map(c => ({ ...c, removed: ov[c.key] === null, manual: ov[c.key] !== undefined && ov[c.key] !== null }));
+  for (const [k, v] of Object.entries(ov)) if (v !== null && !rows.find(r => r.key === k)) {
+    const pres = B2U.resolve(conv3.proc, plan.process); const u1 = pres[k] !== undefined ? pres[k] : conv3.tpl[k];
+    rows.push({ key: k, bambu: info.cfg[k], u1, value: v, manual: true, added: true });
+  }
+  rows.sort((a, b) => a.key.localeCompare(b.key));
+  const procs = conv3.processesFor(plan.nozzle);
+  const mappedTo = s => info.filaments.filter(f => +plan.map[f.idx] === s);
+  el.innerHTML = `
+  <div class="sum">
+    <div><span>File</span>${esc(proj.file.name)}</div>
+    <div><span>Made for</span>${esc(info.printer || 'unknown printer')}</div>
+    <div><span>Process</span>${esc(info.process || '—')}</div>
+    <div><span>Plates · objects</span>${info.plates} · ${info.objects}</div>
+    <div><span>Painted triangles</span>${info.paintedTris.toLocaleString()}</div>
+    <div><span>Embedded Bambu presets · old G-code</span>${info.embedded.length} · ${info.gcodeFiles.length ? 'yes' : 'no'}</div>
+  </div>
+
+  <div class="sec"><h3>U1 toolhead slots</h3>
+    <div class="slotgrid">${plan.slots.map((s, i) => `
+      <div class="slot"><h4><b>T${i + 1}</b> Slot ${i + 1}</h4>
+        <input type="color" class="slotc" data-s="${i}" value="${esc(s.colour.slice(0, 7))}">
+        <select class="slotp" data-s="${i}" style="margin-top:6px">${filamentOptions(plan.nozzle, s.preset)}</select>
+        <div class="from">${mappedTo(i + 1).map(f => `<span class="sw" style="background:${esc(f.colour)}"></span>#${f.idx}`).join(' ') || 'unused'}</div>
+      </div>`).join('')}
+    </div>
+  </div>
+
+  <div class="sec"><h3>Bambu filaments → U1 slot</h3>
+    <div class="card"><table>
+      <tr><th>Bambu filament</th><th>Preset in the file</th><th>Used by</th><th style="width:140px">U1 slot</th></tr>
+      ${info.filaments.map(f => `<tr><td><span class="sw" style="background:${esc(f.colour)}"></span>#${f.idx} · ${esc(f.type)}</td><td>${esc(f.settingsId)}</td>
+        <td class="muted">${f.used ? [f.uses.paint && `${f.uses.paint} painted`, f.uses.parts && `${f.uses.parts} part${f.uses.parts > 1 ? 's' : ''}`, f.uses.other && 'other'].filter(Boolean).join(', ') : 'not used'}</td>
+        <td><select class="fmap" data-f="${f.idx}">${[1, 2, 3, 4].map(n => `<option value="${n}"${+plan.map[f.idx] === n ? ' selected' : ''}>Slot ${n}</option>`).join('')}</select></td></tr>`).join('')}
+    </table></div>
+    ${info.filaments.filter(f => f.used).length > 4 ? '<p class="muted">This project uses more than 4 filaments. Extra ones are merged into the slot with the closest colour. Change that in the U1 slot column.</p>' : ''}
+  </div>
+
+  <div class="sec"><h3>Printer &amp; process</h3>
+    <div class="opts" style="margin:0">
+      <div class="opt"><h3>Nozzle</h3><select id="p-noz">${['0.2', '0.4', '0.6', '0.8'].map(n => `<option${n === plan.nozzle ? ' selected' : ''}>${n}</option>`).join('')}</select></div>
+      <div class="opt" style="flex:2 1 320px"><h3>U1 process</h3><select id="p-proc">${procs.map(n => `<option${n === plan.process ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select><div class="muted" style="margin-top:4px">Bambu layer height: ${info.layerHeight} mm</div></div>
+      <div class="opt"><h3>Options</h3>
+        <label><input type="checkbox" id="p-rec" ${plan.recenter !== false ? 'checked' : ''}><span>Centre plates on the U1 bed</span></label>
+        <label><input type="checkbox" id="p-keep" ${plan.keepProcess !== false ? 'checked' : ''}><span>Carry over my Bambu process changes</span></label>
+        <label><input type="checkbox" id="p-hf" ${plan.hotend === 'high_flow' ? 'checked' : ''}><span>U1 has high-flow hotends</span></label>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec"><h3>Process settings changed from the U1 default</h3>
+    <div class="card"><table>
+      <tr><th>Setting</th><th>Bambu value</th><th>U1 default</th><th style="width:34%">Result</th><th></th></tr>
+      ${rows.length ? rows.map(r => `<tr class="${r.manual ? 'manual' : ''}" style="${r.removed || plan.keepProcess === false && !r.manual ? 'opacity:.45' : ''}">
+        <td class="k">${esc(r.key)}</td><td class="v">${esc(fmt(r.bambu))}</td><td class="v">${esc(fmt(r.u1))}</td>
+        <td class="res">${r.removed ? '<span class="why">U1 default kept</span>' : editor(r.key, r.manual ? ov[r.key] : r.value, Array.isArray(r.u1) && r.u1.length === 2 ? ['standard', 'high_flow'] : [], 'pov')}
+          <div class="why">${r.manual ? (r.added ? 'manual override' : 'edited') : esc(r.note || 'from your Bambu project')}</div></td>
+        <td>${r.removed ? `<button class="prs" data-k="${esc(r.key)}">Restore</button>` : `<button class="prm" data-k="${esc(r.key)}" title="Use the U1 value">✕</button>`}</td></tr>`).join('')
+        : '<tr><td colspan="5" class="muted">None. The U1 process is used as is.</td></tr>'}
+    </table>
+    <div class="add" style="padding:0 10px 10px"><span class="why" style="font-size:12.5px">Override another process setting:</span><input type="text" id="p-addk" list="pkeys" placeholder="e.g. sparse_infill_density"><datalist id="pkeys">${printKeyList.map(k => `<option value="${k}">`).join('')}</datalist><button id="p-addb">Add</button></div>
+    </div>
+    ${pc.skipped.length ? `<details><summary>${pc.skipped.length} Bambu process change${pc.skipped.length > 1 ? 's' : ''} not carried over</summary><table><tr><th>Setting</th><th>Why</th></tr>${pc.skipped.map(x => `<tr><td class="k">${esc(x.key)}</td><td>${esc(x.reason)}</td></tr>`).join('')}</table></details>` : ''}
+  </div>
+
+  <div class="rowbtns"><button class="primary" id="p-go">Convert &amp; download .3mf</button><button id="p-clear">Clear</button><span id="p-status" class="muted"></span></div>
+  ${proj.report ? `<div class="sec"><h3>What was fixed</h3><ul class="rep">${proj.report.fixed.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+    ${proj.report.warnings.length ? `<h3>Check in Snapmaker Orca</h3><ul class="rep w">${proj.report.warnings.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div>` : ''}`;
+}
+function parseOv(card, k){
+  return [...card.querySelectorAll('.pov')].filter(x => x.dataset.k === k).sort((a, b) => a.dataset.s - b.dataset.s).map(x => x.value);
+}
+$('#proj').addEventListener('change', e => {
+  if (!proj) return;
+  const t = e.target, plan = proj.plan;
+  if (t.classList.contains('fmap')) plan.map[t.dataset.f] = +t.value;
+  else if (t.classList.contains('slotc')) plan.slots[+t.dataset.s].colour = t.value.toUpperCase();
+  else if (t.classList.contains('slotp')) { const [kind, ...rest] = t.value.split('|'); plan.slots[+t.dataset.s].preset = { kind, name: rest.join('|') }; }
+  else if (t.id === 'p-noz') { plan.nozzle = t.value; const procs = conv3.processesFor(plan.nozzle); plan.process = procs.filter(n => /Standard/.test(n)).sort((a, b) => Math.abs(parseFloat(a) - proj.info.layerHeight) - Math.abs(parseFloat(b) - proj.info.layerHeight))[0] || procs[0]; }
+  else if (t.id === 'p-proc') plan.process = t.value;
+  else if (t.id === 'p-rec') plan.recenter = t.checked;
+  else if (t.id === 'p-keep') plan.keepProcess = t.checked;
+  else if (t.id === 'p-hf') plan.hotend = t.checked ? 'high_flow' : 'standard';
+  else if (t.classList.contains('pov')) { const v = parseOv($('#proj'), t.dataset.k); plan.procOverrides[t.dataset.k] = v.length === 1 ? v[0] : v; }
+  else if (t.id === 'p-addk') return;
+  proj.report = null;
+  renderProj();
+});
+$('#proj').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'p-addk') { e.preventDefault(); $('#p-addb').click(); } });
+$('#proj').addEventListener('click', async e => {
+  if (!proj) return;
+  const t = e.target, plan = proj.plan;
+  if (t.classList.contains('prm')) { const pc = conv3.processCarry(proj.info, plan.process); if (pc.carry.find(c => c.key === t.dataset.k)) plan.procOverrides[t.dataset.k] = null; else delete plan.procOverrides[t.dataset.k]; renderProj(); }
+  if (t.classList.contains('prs')) { delete plan.procOverrides[t.dataset.k]; renderProj(); }
+  if (t.id === 'p-addb') {
+    const k = $('#p-addk').value.trim();
+    if (!printKeyList.includes(k)) { toast(k ? `"${k}" is not a Snapmaker Orca process setting` : 'Type a setting name'); return; }
+    const pres = B2U.resolve(conv3.proc, plan.process); const cur = pres[k] !== undefined ? pres[k] : conv3.tpl[k];
+    plan.procOverrides[k] = Array.isArray(cur) ? cur.slice() : (cur ?? '');
+    renderProj();
+  }
+  if (t.id === 'p-clear') { proj = null; renderProj(); }
+  if (t.id === 'p-go') {
+    t.disabled = true; $('#p-status').textContent = 'Converting…';
+    try {
+      const customs = customFilaments(plan.nozzle);
+      const { zip, report } = await conv3.convert(proj.zip, proj.info, plan, { JSZip, customs });
+      const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+      proj.report = report;
+      renderProj();
+      await save3mf(proj.file.name.replace(/\.3mf$/i, '') + '-U1.3mf', blob);
+    } catch (err) { console.error(err); toast('Conversion failed: ' + err.message); $('#p-status').textContent = ''; t.disabled = false; }
+  }
+});
+async function save3mf(name, blob){
+  if (downloads) {
+    try { await downloads.save({ filename: name, data: blob }); toast('Saved ' + name); return; }
+    catch (err) {
+      if (err && err.code === 'declined') return;
+      if (err && (err.code === 'rejected_extension' || err.code === 'extension_not_enabled')) {
+        const z = new JSZip(); z.file(name, blob);
+        try { await downloads.save({ filename: name.replace(/\.3mf$/i, '') + '.zip', data: await z.generateAsync({ type: 'blob' }) }); toast('Saved as .zip: extract the .3mf inside it'); }
+        catch (e2) { if (!(e2 && e2.code === 'declined')) toast('Download unavailable here'); }
+        return;
+      }
+      toast('Download unavailable here'); return;
+    }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast('Saved ' + name);
+}
+const drop3 = $('#drop3'), fi3 = $('#file3');
+drop3.onclick = () => fi3.click();
+drop3.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') fi3.click(); };
+fi3.onchange = () => { if (fi3.files[0]) openProject(fi3.files[0]); fi3.value = ''; };
+['dragenter', 'dragover'].forEach(ev => drop3.addEventListener(ev, e => { e.preventDefault(); drop3.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop3.addEventListener(ev, e => { e.preventDefault(); drop3.classList.remove('over'); }));
+drop3.addEventListener('drop', e => { const f = [...e.dataTransfer.files].find(f => /\.3mf$/i.test(f.name)); if (f) openProject(f); else toast('Drop a .3mf file'); });
+
+// tabs (#filaments / #projects)
+function showTab(name){
+  name = name === 'projects' ? 'projects' : 'filaments';
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+  $('#tab-filaments').hidden = name !== 'filaments';
+  $('#tab-projects').hidden = name !== 'projects';
+  $('#refsec').hidden = name !== 'filaments';
+  if (name === 'projects' && proj) renderProj();
+}
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { try { location.hash = b.dataset.tab; } catch {} showTab(b.dataset.tab); });
+window.addEventListener('hashchange', () => showTab(location.hash.slice(1)));
+showTab(location.hash.slice(1));
+/*PWA*/
+
+loadData().catch(err => { $('#status').textContent = 'Could not load preset libraries: ' + err.message; });
+</script>
+</body>
+</html>
