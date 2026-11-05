@@ -21,6 +21,7 @@ page. The README describes all features. The 3MF conversion is based on
 
 ## Rules
 - Always open a pull request for any code change. Never push or merge to `main`.
+- Open pull requests ready for review, never as drafts: the owner only clicks Merge and Confirm.
 - The repo is public: never commit anything personal (names, emails, IPs, server
   addresses, tokens, the owner's own filament files).
 - Run `npm test` before opening a pull request.
