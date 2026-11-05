@@ -47,7 +47,7 @@ Kept in the browser (export/import as a backup file):
 A step-by-step guide to Snapmaker Orca's *Calibration* menu (temperature, max flowrate, pressure advance, flow ratio, retraction), with calculators for each test. Enter the results per filament type and download updated presets to re-import.
 
 ### Keeping up to date
-Every Monday a GitHub Action rebuilds the preset data from the latest **Bambu Studio** and **Snapmaker Orca** releases. If anything changed and the tests pass, it commits the new data and publishes a new image.
+Every Monday a GitHub Action rebuilds the preset data from the latest **Bambu Studio** and **Snapmaker Orca** releases. If anything changed and the tests pass, it opens a pull request with the new data. Merging it publishes a new image.
 
 GitHub pauses scheduled workflows in repositories with no activity for 60 days. Re-enable it under *Actions → Update preset data*, or run it by hand there.
 
