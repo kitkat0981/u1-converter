@@ -17,7 +17,13 @@ page. The README describes all features. The 3MF conversion is based on
   pull request when the data changed.
 - Every push to `main` builds and publishes `ghcr.io/kitkat0981/u1-converter:latest`
   (`docker.yml`): nginx serving the bundle, mapped to port 8765 in `docker-compose.yml`.
-- Self-hosted on a home CasaOS (Ubuntu) server that pulls the image from GHCR.
+- Self-hosted on a home CasaOS (Ubuntu) server that pulls the image from GHCR. That server runs
+  one shared Watchtower that updates containers labelled
+  `com.centurylinklabs.watchtower.enable=true` (the label in `docker-compose.yml`). Never add a
+  Watchtower service to `docker-compose.yml`: Watchtower removes other Watchtowers, so two of
+  them delete each other.
+- The server's copy of `docker-compose.yml` is a separate file, not a git checkout: a merged
+  change to it does not reach the server. When a PR changes it, give the owner the manual edit.
 
 ## Rules
 - Always open a pull request for any code change. Never push or merge to `main`.
