@@ -85,10 +85,12 @@ docker run -d --name u1-converter --restart unless-stopped -p 8765:80 ghcr.io/ki
 ```sh
 cd ~/u1-converter && docker compose pull && docker compose up -d
 ```
-Or update automatically with [Watchtower](https://containrrr.dev/watchtower/), e.g. once a day:
+Or update automatically with [Watchtower](https://github.com/nicholas-fedor/watchtower). `docker-compose.yml`
+labels the container `com.centurylinklabs.watchtower.enable=true`, so a Watchtower that only updates labelled
+containers picks it up:
 ```sh
 docker run -d --name watchtower --restart unless-stopped -v /var/run/docker.sock:/var/run/docker.sock \
-  containrrr/watchtower --schedule "0 0 4 * * *" --cleanup u1-converter
+  nickfedor/watchtower --label-enable --cleanup --interval 300
 ```
 
 **Remove:** `docker compose down` in the same folder.
