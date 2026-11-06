@@ -92,6 +92,13 @@ containers picks it up:
 docker run -d --name watchtower --restart unless-stopped -v /var/run/docker.sock:/var/run/docker.sock \
   nickfedor/watchtower --label-enable --cleanup --interval 300
 ```
+**Already running a Watchtower?** Then skip that command: the label is all it needs (if it was started without
+`--label-enable`, it updates every container anyway). Run only **one** Watchtower per server. Watchtower removes any
+other Watchtower it finds, so two of them keep deleting each other. For the same reason, don't add a Watchtower service
+to this `docker-compose.yml`.
+
+The image is public, so Watchtower needs no registry login for it. After a label change, recreate the container
+(`docker compose up -d`): Docker only applies labels when a container is created.
 
 **Remove:** `docker compose down` in the same folder.
 
