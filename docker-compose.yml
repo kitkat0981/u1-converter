@@ -6,3 +6,6 @@ services:
     restart: unless-stopped
     ports:
       - "8765:80"
+    labels:
+      # Lets a Watchtower started with --label-enable update this container.
+      com.centurylinklabs.watchtower.enable: "true"
